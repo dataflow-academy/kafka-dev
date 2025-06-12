@@ -30,9 +30,9 @@ public class WindTurbineDataSupplier implements Supplier<WindTurbineData> {
         WindTurbineData windTurbineData = new WindTurbineData(
                 turbine.id,
                 turbine.parkId,
-                rand.nextDouble(0, turbine.maxPower),
+                rand.nextDouble(0, turbine.maxPower)
                 // TODO: Uncomment this for the next exercise
-                // manufacturers.get(rand.nextInt(manufacturers.size()))
+                // , manufacturers.get(rand.nextInt(manufacturers.size()))
                 );
 
         if (msgCount >= msgsPerSec && msgsPerSec != -1) {
