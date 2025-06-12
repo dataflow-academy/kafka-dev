@@ -1,0 +1,38 @@
+plugins {
+    id 'java'
+    id 'application'
+
+    // Needed for Avro
+    id 'com.github.davidmc24.gradle.plugin.avro' version '1.9.1'
+}
+
+group = 'example.simple'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_16
+    targetCompatibility = JavaVersion.VERSION_16
+}
+
+repositories {
+    mavenCentral()
+
+    // Needed for io.confluent:*
+    maven {
+        url "https://packages.confluent.io/maven"
+    }
+}
+
+dependencies {
+    implementation 'org.apache.kafka:kafka-clients:3.9.0'
+    implementation 'org.slf4j:slf4j-simple:1.7.32'
+    implementation 'com.google.code.gson:gson:2.8.9'
+
+    // Needed for Avro
+    implementation 'io.confluent:kafka-avro-serializer:7.9.1'
+    implementation 'org.apache.avro:avro:1.11.3'
+}
+
+application {
+    mainClass = 'wind.WindTurbineAvroProducer'
+}

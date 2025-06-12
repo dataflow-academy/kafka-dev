@@ -1,0 +1,27 @@
+services:
+  karapace-schema-registry:
+    image: ghcr.io/aiven-open/karapace:5.0.0
+    entrypoint:
+      - python3
+      - -m
+      - karapace
+    network_mode: host
+    environment:
+      KARAPACE_KARAPACE_REGISTRY: "true"
+      KARAPACE_ADVERTISED_HOSTNAME: localhost
+      KARAPACE_ADVERTISED_PROTOCOL: http
+      KARAPACE_BOOTSTRAP_URI: localhost:9092
+      KARAPACE_PORT: 8081
+      KARAPACE_HOST: 0.0.0.0
+      KARAPACE_CLIENT_ID: karapace-schema-registry-0
+      KARAPACE_GROUP_ID: karapace-schema-registry
+      KARAPACE_TOPIC_NAME: _schemas
+      KARAPACE_REST_AUTHORIZATION: "false"
+      KARAPACE_COMPATIBILITY: FULL
+      KARAPACE_MASTER_ELIGIBILITY: "true"
+      KARAPACE_REPLICATION_FACTOR: 3
+      KARAPACE_SECURITY_PROTOCOL: PLAINTEXT
+      KARAPACE_KARAPACE_REST: "false"
+      KARAPACE_SESSION_TIMEOUT_MS: 10000
+      KARAPACE_LOG_LEVEL: WARNING
+      KARAPACE_PROTOBUF_RUNTIME_DIRECTORY: runtime
