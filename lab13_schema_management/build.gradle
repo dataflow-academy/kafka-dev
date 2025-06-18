@@ -36,3 +36,11 @@ dependencies {
 application {
     mainClass = 'wind.WindTurbineAvroProducer'
 }
+
+sourceSets {
+    main {
+        java {
+            srcDir 'build/generated-main-avro-java'
+        }
+    }
+}
