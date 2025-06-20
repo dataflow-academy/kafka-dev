@@ -2,6 +2,8 @@ package wind;
 
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import io.confluent.kafka.serializers.KafkaAvroDeserializer;
+import io.confluent.kafka.serializers.KafkaAvroDeserializerConfig;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -14,10 +16,10 @@ public class WindTurbineAvroConsumer {
     public static void main(final String[] args) throws IOException {
         final Properties props = new Properties();
         // What do you need to configure here?
-        // Hints:
-        // Consumers use Deserializers instead of Serializers
-        // Consumers need a group.id
-        // Check the auto.offset.reset config ;)
+
+        // Configure to use specific Avro classes instead of generic records
+        props.put(KafkaAvroDeserializerConfig.SPECIFIC_AVRO_READER_CONFIG, true);
+
         final String TOPIC = "wind-turbine-data-avro";
 
         final Consumer consumer = null; // todo
