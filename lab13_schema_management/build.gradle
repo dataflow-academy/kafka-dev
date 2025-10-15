@@ -44,3 +44,17 @@ sourceSets {
         }
     }
 }
+
+task runProducer(type: JavaExec) {
+    group = 'application'
+    description = 'Run the Wind Turbine Avro Producer'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'wind.WindTurbineAvroProducer'
+}
+
+task runConsumer(type: JavaExec) {
+    group = 'application'
+    description = 'Run the Wind Turbine Avro Consumer'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'wind.WindTurbineAvroConsumer'
+}
