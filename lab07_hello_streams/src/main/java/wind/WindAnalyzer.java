@@ -8,6 +8,8 @@ import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Printed;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 
@@ -17,13 +19,16 @@ public class WindAnalyzer {
         final Properties settings = new Properties();
         //settings.put(??,??)
         // Tip: You have to assign an application id in streams.
-        // Tip: We do not have serializers/deserializers but so-called serdes in streams. We work with strings for now
-        // Serdes.String().getClass() helps ;)
+        // Tip: We do not have serializers/deserializers but so-called serdes in streams.
+        // In this lab we use StringSerde for the key and the WindTurbineDataSerDe for the value.
 
         // See below
         final Topology topology = getTopology();
         System.out.println("you can paste the topology into this site for a vizualization: https://zz85.github.io/kafka-streams-viz/");
+        
         System.out.println(topology.describe());
+        Files.writeString(Paths.get("topology.txt"), topology.describe().toString());
+
         final KafkaStreams streams = new KafkaStreams(topology, settings);
         // We run our Streams application in the background
         final CountDownLatch latch = new CountDownLatch(1);
@@ -51,10 +56,6 @@ public class WindAnalyzer {
         // We need a so-called source processor.
         // In Kafka Streams we can "connect" to a topic via .stream().
         // We want to read the data from the topic wind-turbine-data
-        // Hint: Above, we have configured SerDes for Strings only. But we know, that the data in the
-        // `wind-turbine-data`-Topic are `WindTurbineData`s. For that we need to explicitly set the SerDe
-        // using `Consumed.with(Serdes.String(), new WindTurbineDataSerDe())`
-        // Hint: Check the class `WindTurbineDataSerDe` ;)
         final KStream<String, WindTurbineData> windTurbineData = null; // todo
 
         // TASK 1: Simple transformations
@@ -85,7 +86,6 @@ public class WindAnalyzer {
         // The solution from Task 2 is working but not really elegant. Using split() and branch() makes your life easier ;)
         // Hint: Write the data for much wind to the topic `much-wind` and the one for little wind to `little-wind`
         //       Use therefore the function to().
-        //       To configure the SerDe use the function Produced.with(Serdes.String(), new WindTurbineDataSerDe()) as the second argument
         // todo
 
         return builder.build();
