@@ -17,23 +17,27 @@ public class WindAnalyzer {
     public static void main(final String[] args) throws IOException {
 
         final Properties settings = new Properties();
-        //settings.put(??,??)
+        // settings.put(??,??)
         // Tip: You have to assign an application id in streams.
-        // Tip: We do not have serializers/deserializers but so-called serdes in streams.
-        // In this lab we use StringSerde for the key and the WindTurbineDataSerDe for the value.
+        // Tip: We do not have serializers/deserializers but so-called serdes in
+        // streams.
+        // In this lab we use StringSerde for the key and the WindTurbineDataSerDe for
+        // the value.
 
         // See below
         final Topology topology = getTopology();
-        System.out.println("you can paste the topology into this site for a vizualization: https://zz85.github.io/kafka-streams-viz/");
-        
+        System.out.println(
+                "you can paste the topology into this site for a vizualization: https://zz85.github.io/kafka-streams-viz/");
+
         System.out.println(topology.describe());
-        Files.writeString(Paths.get("topology.txt"), topology.describe().toString());
+        Files.writeString(Paths.get("dev-training/lab07_hello_streams/topology.txt"), topology.describe().toString());
 
         final KafkaStreams streams = new KafkaStreams(topology, settings);
         // We run our Streams application in the background
         final CountDownLatch latch = new CountDownLatch(1);
 
-        //... and wait for a SIGTERM. Then we cleanly close Kafka streams and exit the program
+        // ... and wait for a SIGTERM. Then we cleanly close Kafka streams and exit the
+        // program
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             System.out.println("<<< Stopping the streams-app Application");
             streams.close();
@@ -50,7 +54,6 @@ public class WindAnalyzer {
         System.exit(0);
     }
 
-
     private static Topology getTopology() {
         StreamsBuilder builder = new StreamsBuilder();
         // We need a so-called source processor.
@@ -60,32 +63,37 @@ public class WindAnalyzer {
 
         // TASK 1: Simple transformations
 
-        // The Power in the topic is given in Kilo-Watts. But we would like to display it in Mega-Watts. How to do that?
+        // The Power in the topic is given in Kilo-Watts. But we would like to display
+        // it in Mega-Watts. How to do that?
         // Hint: You can use the function mapValues
         // Hint2: Use a lambda expression (argument) -> argument * 123
-        //                            or: (argument) -> { return argument * 123; }
+        // or: (argument) -> { return argument * 123; }
         final KStream<String, WindTurbineData> dataInMW = null; // todo
         // Print it to STDOUT
         dataInMW.print(Printed.toSysOut());
 
         // TASK 2: Filtering data
         // Uncomment the code only if you have finished task 1
-/*
-        // Now we care only about the data if the currentPower is less than 10000 Watts.
-        // Hint: Use the function filter
-        final KStream<String, WindTurbineData> littleWind = null; // Todo
-        // Print it to STDOUT
-        littleWind.print(Printed.toSysOut());
-
-        // Now we care only about the data if the currentPower is larger than 10000 Watts.
-        final KStream<String, WindTurbineData> muchWind = null; // Todo
-        muchWind.print(Printed.toSysOut());
-*/
+        /*
+         * // Now we care only about the data if the currentPower is less than 10000
+         * Watts.
+         * // Hint: Use the function filter
+         * final KStream<String, WindTurbineData> littleWind = null; // Todo
+         * // Print it to STDOUT
+         * littleWind.print(Printed.toSysOut());
+         * 
+         * // Now we care only about the data if the currentPower is larger than 10000
+         * Watts.
+         * final KStream<String, WindTurbineData> muchWind = null; // Todo
+         * muchWind.print(Printed.toSysOut());
+         */
         // Extra TASK 3: Branching
 
-        // The solution from Task 2 is working but not really elegant. Using split() and branch() makes your life easier ;)
-        // Hint: Write the data for much wind to the topic `much-wind` and the one for little wind to `little-wind`
-        //       Use therefore the function to().
+        // The solution from Task 2 is working but not really elegant. Using split() and
+        // branch() makes your life easier ;)
+        // Hint: Write the data for much wind to the topic `much-wind` and the one for
+        // little wind to `little-wind`
+        // Use therefore the function to().
         // todo
 
         return builder.build();
