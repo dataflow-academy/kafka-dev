@@ -1,7 +1,9 @@
 package wind;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.function.Supplier;
 
@@ -10,14 +12,19 @@ public class WindTurbineDataSupplier implements Supplier<WindTurbineData> {
     private final Random rand = new Random();
     private final int msgsPerSec;
     List<TurbineProperties> turbines = new ArrayList<>();
+    Map<String, Double> lastPower = new HashMap<>();
     private int msgCount = 0;
 
     public WindTurbineDataSupplier(int numTurbines, int msgsPerSec) {
         this.msgsPerSec = msgsPerSec;
         for (int i = 0; i < numTurbines; i++) {
-            turbines.add(new TurbineProperties(rand.nextDouble(5000, 1.5 * 1000 * 1000),
-                    "Turbine" + i,
-                    "Windpark" + (i % 5)));
+            double maxPower = rand.nextDouble(2_000_000, 7_000_000); // Peak power up to 7MW
+            String turbineId = "Turbine" + i;
+            turbines.add(new TurbineProperties(maxPower, turbineId, "Windpark" + (i % 5)));
+
+            // Initialize with Gaussian-distributed starting power
+            double initialPower = Math.max(0, Math.min(maxPower, rand.nextGaussian() * maxPower / 3 + maxPower / 2));
+            lastPower.put(turbineId, initialPower);
         }
     }
 
@@ -25,9 +32,21 @@ public class WindTurbineDataSupplier implements Supplier<WindTurbineData> {
     public WindTurbineData get() {
 
         TurbineProperties turbine = turbines.get(rand.nextInt(turbines.size()));
+        double previousPower = lastPower.get(turbine.id);
 
-        WindTurbineData windTurbineData = new WindTurbineData(turbine.id, turbine.parkId,
-                rand.nextDouble(0, turbine.maxPower));
+        // Generate power change using Gaussian distribution (smaller changes more
+        // likely)
+        double changeStdDev = turbine.maxPower * 0.1; // Standard deviation is 10% of max power
+        double change = rand.nextGaussian() * changeStdDev;
+        double newPower = previousPower + change;
+
+        // Clamp power between 0 and maxPower
+        newPower = Math.max(0, Math.min(turbine.maxPower, newPower));
+
+        // Store the new power value
+        lastPower.put(turbine.id, newPower);
+
+        WindTurbineData windTurbineData = new WindTurbineData(turbine.id, turbine.parkId, newPower);
 
         if (msgCount >= msgsPerSec && msgsPerSec != -1) {
             try {
