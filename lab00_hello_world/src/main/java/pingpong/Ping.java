@@ -23,7 +23,7 @@ public class Ping {
 
         // Please always close the producers. try(var) {} closes it automatically
         try (Producer<String, String> producer = new KafkaProducer<>(props)) {
-            for (int i = 0; i < 50; i++) {
+            for (int i = 0; i < numMessages; i++) {
                 String msg = "Ping " + i;
                 Thread.sleep(1000);
                 // Create a message (record) to send to Kafka
