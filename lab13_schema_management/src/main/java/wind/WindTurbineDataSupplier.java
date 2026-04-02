@@ -45,12 +45,9 @@ public class WindTurbineDataSupplier implements Supplier<WindTurbineData> {
         // Update turbine wind speed
         turbine.currentWindSpeed = newWindSpeed;
 
-        WindTurbineData windTurbineData = new WindTurbineData(turbine.id,
-                turbine.parkId,
-                newPowerOutput
-        // TODO: Uncomment this for the next exercise
-        // , turbine.manufacturer
-        );
+        // After you define fields in WindTurbineData.avsc and run ./gradlew generateAvroJava,
+        // use the generated constructor, e.g. new WindTurbineData(turbine.id, turbine.parkId, newPowerOutput, …).
+        WindTurbineData windTurbineData = new WindTurbineData();
 
         if (msgCount >= msgsPerSec && msgsPerSec != -1) {
             try {

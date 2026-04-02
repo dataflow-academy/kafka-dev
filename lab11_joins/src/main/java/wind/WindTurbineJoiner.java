@@ -10,12 +10,13 @@ import wind.common.JSONSerde;
 import wind.common.KafkaStreamsUtils;
 import wind.datatypes.*;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Properties;
 
 public class WindTurbineJoiner {
 
-    public static void main(final String[] args) {
+    public static void main(final String[] args) throws IOException {
         final Properties settings = new Properties();
         settings.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         settings.put(StreamsConfig.APPLICATION_ID_CONFIG, "wind-turbine-joiner");

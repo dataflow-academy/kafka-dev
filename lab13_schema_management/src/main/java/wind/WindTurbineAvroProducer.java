@@ -33,7 +33,6 @@ public class WindTurbineAvroProducer {
         try (producer) {
             windTurbineDataStream.forEach(turbineData -> {
                 // TODO: Produce the data
-                System.out.println("Produced data for wind turbine " + turbineData.getWindTurbineId());
             });
         }
     }

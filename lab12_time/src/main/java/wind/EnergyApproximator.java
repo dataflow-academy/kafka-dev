@@ -9,12 +9,13 @@ import wind.common.JSONSerde;
 import wind.common.KafkaStreamsUtils;
 import wind.common.SlidingAverage;
 
+import java.io.IOException;
 import java.util.Properties;
 
 public class EnergyApproximator {
 
     // This is always the same
-    public static void main(final String[] args) {
+    public static void main(final String[] args) throws IOException {
         final Properties settings = new Properties();
         settings.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         settings.put(StreamsConfig.APPLICATION_ID_CONFIG, "wind-turbine-energy-approximator");

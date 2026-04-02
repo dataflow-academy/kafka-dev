@@ -14,7 +14,7 @@ public class KafkaStreamsUtils {
         System.out.println(
                 "you can paste the topology into this site for a visualization: https://zz85.github.io/kafka-streams-viz/");
         System.out.println(topology.describe());
-        Files.writeString(Paths.get("dev-training/lab11_joins/topology.txt"), topology.describe().toString());
+        Files.writeString(Paths.get("topology.txt"), topology.describe().toString());
         final KafkaStreams streams = new KafkaStreams(topology, streamsProperties);
 
         // Let us run Kafka Streams in the background
