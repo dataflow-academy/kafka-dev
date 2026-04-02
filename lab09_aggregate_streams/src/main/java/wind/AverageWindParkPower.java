@@ -11,6 +11,7 @@ import wind.common.KafkaStreamsUtils;
 import wind.common.WindSerdes;
 import wind.common.WindTurbineData;
 
+import java.io.IOException;
 import java.util.Properties;
 
 public class AverageWindParkPower {
@@ -18,7 +19,7 @@ public class AverageWindParkPower {
     // This class is for Lab 10!
     // Important! Please finish the `AverageWindTurbinePower`-Task first ;)
 
-    public static void main(final String[] args) {
+    public static void main(final String[] args) throws IOException {
         final Properties settings = new Properties();
         // todo: Provide the correct properties
 

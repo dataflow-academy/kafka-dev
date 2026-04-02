@@ -2,9 +2,5 @@
   "namespace": "wind",
   "type": "record",
   "name": "WindTurbineData",
-  "fields": [
-    {"name": "windTurbineId", "type": "string"},
-    {"name": "windParkId", "type": "string"},
-    {"name": "currentPower", "type": "double"}
-  ]
+  "fields": []
 }
