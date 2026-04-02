@@ -8,8 +8,6 @@ import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Printed;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 
@@ -30,7 +28,6 @@ public class WindAnalyzer {
                 "you can paste the topology into this site for a vizualization: https://zz85.github.io/kafka-streams-viz/");
 
         System.out.println(topology.describe());
-        Files.writeString(Paths.get("dev-training/lab07_hello_streams/topology.txt"), topology.describe().toString());
 
         final KafkaStreams streams = new KafkaStreams(topology, settings);
         // We run our Streams application in the background

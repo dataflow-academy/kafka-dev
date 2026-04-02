@@ -3,6 +3,8 @@
   "type": "record",
   "name": "WindTurbineData",
   "fields": [
-    // TODO: Add the fields here
+    {"name": "windTurbineId", "type": "string"},
+    {"name": "windParkId", "type": "string"},
+    {"name": "currentPower", "type": "double"}
   ]
 }
