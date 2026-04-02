@@ -29,6 +29,7 @@ wind_turbine_topic = None
 wind_park_masterdata_topic = None
 
 # todo Init the table for the master data
+# Hint: masterdata-wind_parks from JDBC Connect often has 1 partition — set partitions=1 on the Table if you see changelog mismatch errors.
 wind_park_masterdata_table = None
 
 # todo let us write the joined result to the topic wind-turbine-data-with-wind-park-names. Use the WindTurbineDataWithName record type

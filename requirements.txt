@@ -1,0 +1,5 @@
+# Python track — install in a venv before running labs (see README).
+confluent-kafka>=2.3,<3
+faust-streaming[rocksdb]>=0.11,<0.12
+aiokafka>=0.10,<0.13
+bottle>=0.12

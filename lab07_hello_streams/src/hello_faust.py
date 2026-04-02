@@ -6,6 +6,7 @@ app = faust.App(
     'hello_faust', # The name of the app. Faust instances with the same name form a cluster
     broker='kafka://localhost:9092',
     store='rocksdb://', # Where to store the local state (use memory:// only for development. rocksdb:// for production)
+    # Optional: disable the built-in web UI if port 6066 is already in use: enable_web=False
 )
 
 # Define a topic

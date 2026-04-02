@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from datetime import timedelta, datetime
 
+import faust
+
 from datatypes import *
 
 ################ Task: Approximate generated energy
@@ -22,8 +24,8 @@ app.conf.table_cleanup_interval = 1
 # the table (defined below) consists of Keys of the Form (KEY, (window_start_timestamp, window_end_timestamp))
 # The values are the SlidingAverages used in previous labs
 def window_processor(key, sliding_average: SlidingAverage):
-    # get the key
-    real_key, [start_timestamp, end_timestamp] = key
+    # get the key (window key is (turbine_id, (window_start, window_end)))
+    real_key, (start_timestamp, end_timestamp) = key
     # unpack the sliding average
     mean = sliding_average.average
     # transform timestamps to dates
@@ -47,6 +49,7 @@ wind_turbine_topic = None
 # Hints:
 # * the window_processor() should be called when the window closes
 # * We should use a tumbling window (what's that?) with a 10s interval that expires after 10 more seconds
+# * If `wind-turbine-data` has only one partition, pass partitions=1 on the Table so the changelog matches.
 windowed_power_table = None
 
 
