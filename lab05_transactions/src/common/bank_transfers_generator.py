@@ -2,7 +2,7 @@ import random
 import time
 
 
-class BankTransactionGenerator:
+class BankTransferGenerator:
     msgs_per_sec = 0
     names = ["Alice", "Bob", "Charlie", "Dave", "Eve", "Francis"]
     msg_count = 0
@@ -17,7 +17,7 @@ class BankTransactionGenerator:
         return self.next()
 
     def next(self):
-        transaction = {
+        transfer = {
             'sender_account': random.choice(self.names),
             'receiver_account': random.choice(self.names),
             'amount': random.randint(0, 100) * (random.randint(0, 10) + 1),
@@ -28,4 +28,4 @@ class BankTransactionGenerator:
             time.sleep(1)
             self.msg_count = 0
         self.msg_count += 1
-        return transaction
+        return transfer

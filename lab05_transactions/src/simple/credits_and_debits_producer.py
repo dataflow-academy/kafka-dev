@@ -2,36 +2,40 @@
 import sys
 import os
 sys.path.append(os.path.abspath('../common'))
-from bank_transaction_generator import BankTransactionGenerator
+from bank_transfers_generator import BankTransferGenerator
 from confluent_kafka import Producer
 
-# todo Configure the producer
-# What is required for transactions
+# TODO: Configure `props` for a transactional producer.
+# Hints:
+# * How does Kafka know which producer owns the transaction?
+# * How to ensure reliable production inside of a transaction?
+
 props = {}
-p = Producer(props)
+producer = Producer(props)
 CREDITS_TOPIC = "credits"
 DEBITS_TOPIC = "debits"
 try:
-    # todo setup the producer for using transactions
+    # TODO: Prepare the producer for transactions
 
-    for transaction in BankTransactionGenerator(1):
-        p.begin_transaction()
-        suspicious = " <-Suspicious!" if transaction["suspicious"] else ""
+    for transfer in BankTransferGenerator(1):
+        # TODO: Start a transaction
+        suspicious = " <-Suspicious!" if transfer["suspicious"] else ""
 
-        # todo produce two messages: one to the credits-topic and one to the debits topic
-        # Mark the suspicious transactions by appending the variable above
+        # TODO: Produce two messages: one to `CREDITS_TOPIC`, one to `DEBITS_TOPIC`.
+        # Append `suspicious` to the payload string when the flag is set so suspicious transfers are visible in the log.
 
-        print("{} -> {}: {}€".format(transaction["sender_account"], transaction["receiver_account"], transaction["amount"]))
+        print("{} -> {}: {}€".format(transfer["sender_account"], transfer["receiver_account"], transfer["amount"]))
+
         # For this example we need to flush the messages manually, otherwise we might not see any aborted transactions in the topic
-        p.flush()
+        producer.flush()
 
-        if transaction["suspicious"]:
-            # todo abort the transaction when it is suspicious
+        if transfer["suspicious"]:
+            # TODO: abort the transaction when it is suspicious
 
-            print("Suspicious transaction between {} and {}! Amount: {}€",
-                  transaction["sender_account"], transaction["receiver_account"], transaction["amount"])
+            print("Suspicious transfer between {} and {}! Amount: {}€".format(
+                transfer["sender_account"], transfer["receiver_account"], transfer["amount"]))
         else:
-            # todo otherwise commit it
+            # TODO: commit the transaction
             pass
 finally:
-    p.flush()
+    producer.flush()
