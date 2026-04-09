@@ -63,14 +63,12 @@ public class WindAnalyzer {
 
         // TASK 1: Simple transformations
 
-        // The Power in the topic is given in Kilo-Watts. But we would like to display
-        // it in Mega-Watts. How to do that?
-        // Hint: You can use the function mapValues
-        // Hint2: Use a lambda expression (argument) -> argument * 123
-        // or: (argument) -> { return argument * 123; }
-        final KStream<String, WindTurbineData> dataInMW = null; // todo
+        // The power in the topic is given in Watts. Display it in Kilo-Watts.
+        // Hint: mapValues and update currentPower (divide by 1_000).
+        // Hint2: (data) -> { WindTurbineData copy = ...; copy.currentPower = data.currentPower / 1_000; return copy; }
+        final KStream<String, WindTurbineData> dataInKW = null; // todo
         // Print it to STDOUT
-        dataInMW.print(Printed.toSysOut());
+        dataInKW.print(Printed.toSysOut());
 
         // TASK 2: Filtering data
         // Uncomment the code only if you have finished task 1
