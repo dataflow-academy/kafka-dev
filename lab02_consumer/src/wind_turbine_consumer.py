@@ -6,32 +6,39 @@ from confluent_kafka import Consumer
 import wind_turbine_api
 
 if __name__ == '__main__':
-    # todo Configure the consumer
-    # We want to read *all* messages in the topic
+    # TODO: Configure the consumer (`props` dict).
+    # Hints:
+    # * How to connect to Kafka?
+    # * How to make the consumer part of a group?
+    # * What to do when there is no committed offset for this group?
+    #
+    # We want to read *all* messages already on the topic when the group starts — pick `auto.offset.reset` accordingly.
+
     props = {}
-    # todo Create the consumer
-    c = None
-    # We start the API on Port 8989 to display the current Power of the wind turbines
+    # TODO: Create the consumer
+    consumer = None
+    # Small HTTP helper on port 8989 to inspect the latest measurements (see `wind_turbine_api.py`).
     wind_turbine_api.start()
     try:
-        # todo How to tell the consumer from which topic (wind-turbine-data) to consume?
+        # TODO: Subscribe to `wind-turbine-data` (or use `assign()` only in the extra exercise).
+        # Hint: `consumer.subscribe([TOPIC])`
 
         while True:
-            # todo get the message
+            # TODO: Poll for messages (`consumer.poll(timeout)` — timeout in seconds as float).
             message = None
-            # the function above does not guarantee us that we get any message back
+            # `poll` may return None when no message arrived in time.
             if message is None:
                 continue
-            # There might be an error
+            # There might be an error record (e.g. partition EOF) — handle it.
             if message.error():
                 print("Consumer error: {}".format(message.error()))
                 continue
-            # todo: Get the key (Kafka knows only byte arrays, but we want a string!)
+            # TODO: Key — Kafka delivers bytes; decode to `str` for the turbine id.
             key = None
-            # todo: Get the value (Kafka knows only byte arrays, but we want a JSON Object!)
+            # TODO: Value — decode bytes to UTF-8, then `json.loads` into a dict (WindTurbineData JSON).
             data = None
-            # Send the current measurement to the api
+            # Push to the small API for visualization
             wind_turbine_api.add_measurement(key, data)
             print("{}: {}".format(key, data))
     finally:
-        c.close()
+        consumer.close()
