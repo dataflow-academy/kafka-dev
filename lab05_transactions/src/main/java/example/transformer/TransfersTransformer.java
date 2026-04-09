@@ -1,7 +1,7 @@
 package example.transformer;
 
-import example.common.BankTransaction;
-import example.common.BankTransactionDeserializer;
+import example.common.BankTransfer;
+import example.common.BankTransferDeserializer;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -15,13 +15,13 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Properties;
 
-public class TransactionsTransformer {
+public class TransfersTransformer {
     public static void main(final String[] args) {
 
         // We now need both a consumer and a producer
         final Properties consumerProps = new Properties();
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BankTransactionDeserializer.class);
+        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, BankTransferDeserializer.class);
         consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "transactions-transformer");
         consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
@@ -34,12 +34,12 @@ public class TransactionsTransformer {
         // todo remember the transactional-id!
 
         // unsere Topics
-        final String TRANSACTIONS_TOPIC = "bank-transactions";
+        final String TRANSFERS_TOPIC = "bank-transfers";
         final String CREDITS_TOPIC = "bank-credits";
         final String DEBITS_TOPIC = "bank-debits";
 
         // Und Consumer/Producer
-        final Consumer<String, BankTransaction> consumer = new KafkaConsumer<>(consumerProps);
+        final Consumer<String, BankTransfer> consumer = new KafkaConsumer<>(consumerProps);
         final Producer<String, String> producer = new KafkaProducer<String, String>(producerProps);
 
         // RAII
@@ -51,16 +51,16 @@ public class TransactionsTransformer {
                 ConsumerGroupMetadata consumerGroupMetadata = null;
 
                 while (true) {
-                    ConsumerRecords<String, BankTransaction> records = consumer.poll(Duration.ofMillis(100));
-                    for (ConsumerRecord<String, BankTransaction> record : records) {
-                        BankTransaction transaction = record.value();
+                    ConsumerRecords<String, BankTransfer> records = consumer.poll(Duration.ofMillis(100));
+                    for (ConsumerRecord<String, BankTransfer> record : records) {
+                        BankTransfer transfer = record.value();
                         // todo start the transaction
 
                         // You know this from part 1
-                        String suspicious = transaction.isSuspicious ? " <-Suspicious!" : "";
-                        ProducerRecord<String, String> senderRecord = new ProducerRecord<>(CREDITS_TOPIC, transaction.sender_account, transaction.amount + "€" + suspicious);
-                        ProducerRecord<String, String> receiverRecord = new ProducerRecord<>(DEBITS_TOPIC, transaction.receiver_account, transaction.amount + "€" + suspicious);
-                        System.out.println("Transforming " + suspicious + " transaction " + transaction);
+                        String suspicious = transfer.isSuspicious ? " <-Suspicious!" : "";
+                        ProducerRecord<String, String> senderRecord = new ProducerRecord<>(CREDITS_TOPIC, transfer.sender_account, transfer.amount + "€" + suspicious);
+                        ProducerRecord<String, String> receiverRecord = new ProducerRecord<>(DEBITS_TOPIC, transfer.receiver_account, transfer.amount + "€" + suspicious);
+                        System.out.println("Transforming " + suspicious + " transfer " + transfer);
 
                         // We send the messages
                         producer.send(senderRecord);
@@ -79,8 +79,8 @@ public class TransactionsTransformer {
                         producer.sendOffsetsToTransaction(offsets, consumerGroupMetadata);
 
                         // If the transaction is suspicious: Cancel! Otherwise commit.
-                        if (transaction.isSuspicious) {
-                            System.out.println("Suspicious transaction between " + transaction.sender_account + " and " + transaction.receiver_account + "! Amount: " + transaction.amount);
+                        if (transfer.isSuspicious) {
+                            System.out.println("Suspicious transfer between " + transfer.sender_account + " and " + transfer.receiver_account + "! Amount: " + transfer.amount);
                             // todo
                         } else {
                             // todo

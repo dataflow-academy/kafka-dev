@@ -1,7 +1,7 @@
 package example.simple;
 
-import example.common.BankTransaction;
-import example.common.BankTransactionSupplier;
+import example.common.BankTransfer;
+import example.common.BankTransferSupplier;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -32,22 +32,22 @@ public class CreditsAndDebitsProducer {
         }
 
 
-        // Here we get a list of transactions (.limits the length of the stream).
+        // Here we get a list of transfers (.limits the length of the stream).
         // Some of them are treacherous
-        final List<BankTransaction> transactions = Stream.generate(new BankTransactionSupplier(10000)).limit(numMessages).collect(Collectors.toList());
+        final List<BankTransfer> transfers = Stream.generate(new BankTransferSupplier(10000)).limit(numMessages).collect(Collectors.toList());
 
         try (Producer<String, String> producer = new KafkaProducer<>(props)) {
             // Before we can use transactions, we need to initialize them
             // todo
 
-            for (BankTransaction transaction : transactions) {
+            for (BankTransfer transfer : transfers) {
                 // Let's start the transaction
                 // How?
 
-                // We simply append "<- Suspicious!" to a transaction value to better see when such transactions come through.
-                String suspicious = transaction.isSuspicious ? " <-Suspicious!" : "";
-                ProducerRecord<String, String> senderRecord = new ProducerRecord<>(CREDITS_TOPIC, transaction.sender_account, transaction.amount + "€" + suspicious);
-                ProducerRecord<String, String> receiverRecord = new ProducerRecord<>(DEBITS_TOPIC, transaction.receiver_account, transaction.amount + "€" + suspicious);
+                // We simply append "<- Suspicious!" to a transfer value to better see when such transfers come through.
+                String suspicious = transfer.isSuspicious ? " <-Suspicious!" : "";
+                ProducerRecord<String, String> senderRecord = new ProducerRecord<>(CREDITS_TOPIC, transfer.sender_account, transfer.amount + "€" + suspicious);
+                ProducerRecord<String, String> receiverRecord = new ProducerRecord<>(DEBITS_TOPIC, transfer.receiver_account, transfer.amount + "€" + suspicious);
 
                 // Let's send the records
                 producer.send(senderRecord);
@@ -56,8 +56,8 @@ public class CreditsAndDebitsProducer {
 
                 // For illustrative purposes only:
 
-                if (transaction.isSuspicious) {
-                    System.out.println("Suspicious transaction between " + transaction.sender_account + " and " + transaction.receiver_account + "! Amount: " + transaction.amount);
+                if (transfer.isSuspicious) {
+                    System.out.println("Suspicious transfer between " + transfer.sender_account + " and " + transfer.receiver_account + "! Amount: " + transfer.amount);
                     // todo cancel transaction
                 } else {
                     // Todo commit transactions
