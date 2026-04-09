@@ -12,7 +12,8 @@ import json
 
 props = {}
 # TODO: Create the producer
-producer = None
+# Check the documentation: https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/index.html#pythonclient-producer
+producer = None 
 try:
     for data in WindTurbineDataGen(50, 1):
         # TODO: Produce JSON to the topic `wind-turbine-data`.
