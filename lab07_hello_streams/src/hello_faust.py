@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 import faust
 
+# Hello Faust — minimal stream processing setup.
+#
+# Hints:
+# * `app` name identifies your application; instances with the same name form a cluster.
+# * `broker` / `kafka://` — cluster bootstrap.
+# * `store` — local state backend (`rocksdb://` for persistence; `memory://` only for quick experiments).
+# * Topics can declare `value_type` / serializers; here `greetings` uses raw strings for simplicity.
+
 # Initialize the Faust App
 app = faust.App(
-    'hello_faust', # The name of the app. Faust instances with the same name form a cluster
+    'hello_faust',  # The name of the app. Faust instances with the same name form a cluster
     broker='kafka://localhost:9092',
-    store='rocksdb://', # Where to store the local state (use memory:// only for development. rocksdb:// for production)
-    # Optional: disable the built-in web UI if port 6066 is already in use: enable_web=False
+    store='rocksdb://',  # Where to store the local state (use memory:// only for development. rocksdb:// for production)
 )
 
 # Define a topic
