@@ -4,23 +4,12 @@ import json
 from confluent_kafka import Consumer, Producer, TopicPartition
 
 # Read–process–write inside Kafka transactions.
-#
-# TODO: Consumer must **not** auto-commit offsets — the producer transaction will commit consumer offsets.
-# Hints:
-# * `bootstrap.servers`, `group.id`, `auto.offset.reset`
-# * `enable.auto.commit` = False
-# * Value: JSON dict — use `value.decode('utf-8')` + `json.loads` after poll.
-#
-# TODO: Producer needs a `transactional.id` and `enable.idempotence`.
-# After construction: `init_transactions()` before the loop.
-#
-# Source topic name must match `bank_transfer_producer.py` (`bank-transfers`).
 
 if __name__ == '__main__':
     # TODO: the consumer must not commit its offsets automatically — where should it start reading?
     consumer_props = {}
     c = Consumer(consumer_props)
-    # TODO: configure the producer for transactions (transactional.id, bootstrap.servers, ...)
+    # TODO: configure the producer for transactions
     producer_props = {}
     p = Producer(producer_props)
     # Source topic
@@ -30,7 +19,7 @@ if __name__ == '__main__':
     DEBITS_TOPIC = "debits"
 
     try:
-        # TODO: subscribe to TRANSFERS_TOPIC; call `p.init_transactions()` once before processing.
+        # TODO: subscribe to TRANSFERS_TOPIC and prepare the producer for transactions
 
         while True:
             message = c.poll(100)
@@ -42,7 +31,7 @@ if __name__ == '__main__':
 
             # TODO: parse JSON bank transfer from `message.value()`
             transfer = None
-            # TODO: `begin_transaction()` (producer) for this processing step
+            # TODO: Start a transaction
 
             suspicious = " <-Suspicious!" if transfer["suspicious"] else ""
 
@@ -52,12 +41,8 @@ if __name__ == '__main__':
                                          transfer["amount"]))
 
             # TODO: you need consumer group metadata to commit offsets through the producer transaction
-            # (Python: `c.consumer_group_metadata()` — check confluent_kafka version/docs).
             group_metadata = None
-            # TODO: build the offset map for `send_offsets_to_transaction` / equivalent API.
-            # Tips:
-            # * `TopicPartition(topic, partition)`
-            # * Commit the **next** offset to read, not the last record's offset blindly — see Kafka transaction docs.
+            # TODO: build the offset map for the producer transaction
 
             p.flush()
 
