@@ -43,6 +43,10 @@ public class AverageWindParkPower {
         // * Directly using groupBy(…)
         // Todo: Try a few different approaches here
 
+        // TIPP: If you have serialization issues when using map or groupByKey, you need to provide the SerDes to groupBy[Key]:
+        // e.g. .groupByKey(Grouped.with(Serdes.String(), WindSerdes.WindTurbineDataSerde()))
+        // Question: Why? Have a look at the topology.
+
         // After you have repartitioned (and grouped) the data you can now aggregate it the same way as in the previous lab
         // please write the data to the topic `wind-park-power-sliding-average`
 
