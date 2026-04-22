@@ -26,3 +26,5 @@ pip install -r requirements.txt
 Complete reference solutions live in the companion repo [**kafka-dev-solutions**](https://github.com/dataflow-academy/kafka-dev-solutions) (`python` branch).
 
 **Tips:** Run Faust workers with `python3 <script>.py worker --without-web` if you start several apps at once (default HTTP port is 6066). For Faust **Tables** fed from topics created by Kafka Connect (e.g. `masterdata-*`), set the table `partitions=` to match the source topic partition count (often **1** in training VMs).
+
+**Labs:** `lab_outbox` (PostgreSQL + Debezium + Connect) and `lab13_schema_management` (Karapace + Avro with `confluent_kafka` serializers) live next to the other Python exercises.
