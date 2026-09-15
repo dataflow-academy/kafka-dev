@@ -10,6 +10,7 @@ buildscript {
 plugins {
     id "java"
     id "idea"
+    id "application"
 }
 
 sourceCompatibility = "16"
@@ -29,6 +30,10 @@ apply plugin: "com.github.johnrengelman.shadow"
 dependencies {
     implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.32'
     implementation 'org.postgresql:postgresql:42.3.5'
+}
+
+application {
+    mainClass = "wind.MaintenanceLogs"
 }
 
 idea {
