@@ -2,12 +2,11 @@ plugins {
     application
 }
 
-// Target Java 21 with whatever JDK runs the build (21 or newer). Deliberately
-// not a toolchain: a toolchain would demand that exact JDK be installed, and
-// the training VM may carry a different one. The dev templates target 25;
-// nothing here depends on the difference.
+// Deliberately not a toolchain: that would demand exactly this JDK be
+// installed. options.release compiles against 25 with whatever JDK runs the
+// build, as long as it is 25 or newer.
 tasks.withType<JavaCompile>().configureEach {
-    options.release = 21
+    options.release = 25
 }
 
 repositories {

@@ -26,8 +26,9 @@ Expects a Kafka cluster on `localhost:9092,9093,9094` and the topic
 | `TOPIC` | `nordwind.scada.public.turbine-telemetry.event` |
 | `TICK_INTERVAL_MS` | `1000` — `0` removes the rate limit, which is what the throughput task needs |
 
-Java 21 or newer. The build targets 21 via `options.release`, so it compiles
-with whatever JDK is installed.
+Java 25 or newer, same as the training VM and the dev templates. The build
+targets 25 via `options.release` rather than a toolchain, so it uses the JDK
+that is already installed instead of demanding a specific one.
 
 ## Where this leads
 
