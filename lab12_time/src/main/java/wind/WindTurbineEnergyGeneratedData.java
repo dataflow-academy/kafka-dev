@@ -2,18 +2,18 @@ package wind;
 
 public class WindTurbineEnergyGeneratedData {
     public String windTurbineId;
-    public double generatedPowerInMwh;
+    public double generatedEnergyInWh;
 
-    public WindTurbineEnergyGeneratedData(String windTurbineId, double generatedPowerInMwh) {
+    public WindTurbineEnergyGeneratedData(String windTurbineId, double generatedEnergyInWh) {
         this.windTurbineId = windTurbineId;
-        this.generatedPowerInMwh = generatedPowerInMwh;
+        this.generatedEnergyInWh = generatedEnergyInWh;
     }
 
     @Override
     public String toString() {
-        return "WindTurbinePowerData{" +
+        return "WindTurbineEnergyGeneratedData{" +
                 "windTurbineId='" + windTurbineId + '\'' +
-                ", generatedPowerInMwh=" + generatedPowerInMwh +
+                ", generatedEnergyInWh=" + generatedEnergyInWh +
                 '}';
     }
 }

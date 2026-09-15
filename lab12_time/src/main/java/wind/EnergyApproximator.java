@@ -42,8 +42,9 @@ public class EnergyApproximator {
         // Todo: We need to window the data.
         // Which window-type makes most sense?
         // * Session Windows? (Using SessionWindows)
-        // * Tumbling Windows? (Using TimeWindows.??.advanceBy(??))
-        // * Sliding windows? (Using TimeWindows)
+        // * Tumbling Windows? (Using TimeWindows.ofSizeWithNoGrace(??))
+        // * Hopping Windows? (Using TimeWindows.ofSizeWithNoGrace(??).advanceBy(??))
+        // * Sliding Windows? (Using SlidingWindows)
         // Implement it :)
         // Hint: You need first to group the data before windowing it
         TimeWindowedKStream<String, WindTurbineData> dataPerMinute = null;
