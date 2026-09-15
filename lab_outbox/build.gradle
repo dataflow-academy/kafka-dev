@@ -1,20 +1,13 @@
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "gradle.plugin.com.github.johnrengelman:shadow:7.1.2"
-    }
-}
-
 plugins {
     id "java"
     id "idea"
     id "application"
 }
 
-sourceCompatibility = "16"
-targetCompatibility = "16"
+java {
+    sourceCompatibility = "16"
+    targetCompatibility = "16"
+}
 version = "0.0.1"
 
 repositories {
@@ -24,8 +17,6 @@ repositories {
         url "https://packages.confluent.io/maven"
     }
 }
-
-apply plugin: "com.github.johnrengelman.shadow"
 
 dependencies {
     implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.32'
