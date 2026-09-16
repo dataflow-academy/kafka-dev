@@ -59,8 +59,7 @@ public final class ProducerApp {
      * and turns a run into a measurement that stops after MEASURE_SECONDS.
      */
     private static final long TICK_INTERVAL_MS = 1000;
-    /** Unbraked, a producer fills gigabytes of disk per minute. */
-    private static final long MEASURE_SECONDS = 30;
+    private static final long MEASURE_SECONDS = 120;
 
     /** Set by the delivery callback when a send has failed for good. */
     private static final AtomicBoolean fatalError = new AtomicBoolean(false);
@@ -79,8 +78,6 @@ public final class ProducerApp {
         // configured in TODO 1 - they have to match.
         Producer<?, ?> producer = null; // new KafkaProducer<>(producerConfig())
 
-        // Delete this guard once TODO 2 is done. Without it the loop would run
-        // and report progress while nothing reaches Kafka.
         if (producer == null) {
             log.error("No producer yet - TODO 2 is still open. See the lab text.");
             System.exit(1);
@@ -137,9 +134,8 @@ public final class ProducerApp {
 
                 long now = System.currentTimeMillis();
                 if (now - lastReport >= 5000) {
+                    logProgress(producer, (now - lastReport) / 1000.0);
                     lastReport = now;
-                    log.info("Produced {} measurements so far ({} msg/s)",
-                            produced, produced * 1000 / (now - startedAt));
                 }
 
                 // Keep a steady tick rate regardless of how long sending took.
@@ -148,6 +144,11 @@ public final class ProducerApp {
                     Thread.sleep(sleep);
                 }
             }
+
+            // Flush first, so the summary covers every record, not just the
+            // ones that happened to be acknowledged when the loop ended.
+            producer.flush();
+            logSummary(producer, System.currentTimeMillis() - startedAt);
         }
         stopped.countDown();
 
@@ -155,9 +156,51 @@ public final class ProducerApp {
             log.error("Exiting due to a fatal delivery error (see log above)");
             System.exit(1);
         }
-        long elapsed = Math.max(1, System.currentTimeMillis() - startedAt);
-        log.info("Producer stopped cleanly after {} measurements in {} s ({} msg/s, close() included)",
-                produced, elapsed / 1000, produced * 1000 / elapsed);
+        log.info("Producer stopped cleanly after {} measurements", produced);
+    }
+
+    private static double lastRecords;
+    private static double lastBytes;
+
+    /**
+     * Throughput since the last report and latency of the last 30 to 60
+     * seconds, in the style of kafka-producer-perf-test. The numbers come from
+     * the producer's own metrics, so they count what was actually sent, not
+     * what was handed to send().
+     */
+    private static void logProgress(Producer<?, ?> producer, double seconds) {
+        double records = metric(producer, "record-send-total");
+        double bytes = metric(producer, "outgoing-byte-total");
+        double queued = metric(producer, "record-queue-time-avg");
+        double request = metric(producer, "request-latency-avg");
+        log.info(String.format("%.0f records/sec (%.2f MB/sec on the wire), latency avg %.1f ms (%.1f queued + %.1f request), max %.0f ms",
+                (records - lastRecords) / seconds,
+                (bytes - lastBytes) / 1_000_000 / seconds,
+                queued + request, queued, request,
+                metric(producer, "record-queue-time-max") + metric(producer, "request-latency-max")));
+        lastRecords = records;
+        lastBytes = bytes;
+    }
+
+    private static void logSummary(Producer<?, ?> producer, long elapsedMs) {
+        double seconds = Math.max(1, elapsedMs) / 1000.0;
+        double records = metric(producer, "record-send-total");
+        log.info(String.format("%.0f records sent in %.0f s, %.0f records/sec (%.2f MB/sec on the wire)",
+                records, seconds, records / seconds, metric(producer, "outgoing-byte-total") / 1_000_000 / seconds));
+        log.info(String.format("batches: avg %.0f bytes, %.1f records per request, compressed to %.0f %%",
+                metric(producer, "batch-size-avg"),
+                metric(producer, "records-per-request-avg"),
+                metric(producer, "compression-rate-avg") * 100));
+    }
+
+    private static double metric(Producer<?, ?> producer, String name) {
+        for (var entry : producer.metrics().entrySet()) {
+            if (entry.getKey().group().equals("producer-metrics") && entry.getKey().name().equals(name)) {
+                Object value = entry.getValue().metricValue();
+                return value instanceof Number n && Double.isFinite(n.doubleValue()) ? n.doubleValue() : 0;
+            }
+        }
+        return 0;
     }
 
     private static void installShutdownHook() {
