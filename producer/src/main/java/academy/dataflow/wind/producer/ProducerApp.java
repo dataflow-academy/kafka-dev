@@ -2,10 +2,11 @@ package academy.dataflow.wind.producer;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.kafka.clients.producer.Producer;
 import org.slf4j.Logger;
@@ -61,12 +62,10 @@ public final class ProducerApp {
     /** Set by the delivery callback when a send has failed for good. */
     private static final AtomicBoolean fatalError = new AtomicBoolean(false);
     private static volatile boolean running = true;
+    /** Counted down once the producer is closed. */
+    private static final CountDownLatch stopped = new CountDownLatch(1);
 
     public static void main(String[] args) throws InterruptedException {
-        // Ctrl+C does not kill the JVM on the spot: the hook below ends the
-        // loop and waits until close() has flushed what is still buffered.
-        installShutdownHook();
-
         WindParkSimulator simulator = new WindParkSimulator();
         long produced = 0;
         long startedAt = System.currentTimeMillis();
@@ -75,6 +74,17 @@ public final class ProducerApp {
         // types. Look at what you are sending and at the serializers you
         // configured in TODO 1 - they have to match.
         Producer<?, ?> producer = null; // new KafkaProducer<>(producerConfig())
+
+        // Delete this guard once TODO 2 is done. Without it the loop would run
+        // and report progress while nothing reaches Kafka.
+        if (producer == null) {
+            log.error("No producer yet - TODO 2 is still open. See the lab text.");
+            System.exit(1);
+        }
+
+        // Ctrl+C does not kill the JVM on the spot: the hook below ends the
+        // loop and waits until close() has flushed what is still buffered.
+        installShutdownHook();
 
         // try-with-resources: close() flushes everything still buffered.
         // A producer that is not closed loses whatever sits in its batches.
@@ -130,6 +140,7 @@ public final class ProducerApp {
                 }
             }
         }
+        stopped.countDown();
 
         if (fatalError.get()) {
             log.error("Exiting due to a fatal delivery error (see log above)");
@@ -139,12 +150,14 @@ public final class ProducerApp {
     }
 
     private static void installShutdownHook() {
-        final Thread mainThread = Thread.currentThread();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (stopped.getCount() == 0) {
+                return; // the loop has already ended, e.g. after giveUp()
+            }
             log.info("Shutdown signal received, stopping producer ...");
             running = false;
             try {
-                mainThread.join(Duration.ofSeconds(15).toMillis());
+                stopped.await(15, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
