@@ -18,12 +18,7 @@ solutions.
 ```
 
 Expects a Kafka cluster on `localhost:9092,9093,9094` and the topic
-`nordwind.scada.public.turbine-telemetry.event`.
-
-| Variable | Default |
-|---|---|
-| `BOOTSTRAP_SERVERS` | `localhost:9092,localhost:9093,localhost:9094` |
-| `TOPIC` | `nordwind.scada.public.turbine-telemetry.event` |
-| `TICK_INTERVAL_MS` | `1000` — `0` removes the rate limit, which is what the throughput task needs |
+`nordwind.scada.public.turbine-telemetry.event`. Both, and the tick interval,
+are constants at the top of `ProducerApp`.
 
 Java 25 or newer.

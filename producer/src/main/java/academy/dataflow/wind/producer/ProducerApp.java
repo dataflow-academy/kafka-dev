@@ -25,8 +25,8 @@ public final class ProducerApp {
     /**
      * The producer configuration.
      *
-     * <p>TODO 1: fill this in. The lab text tells you which questions each
-     * group of settings answers.
+     * <p>TODO 1: fill this in, one group per lab. The lab text tells you
+     * which questions each group of settings answers.
      */
     private static Properties producerConfig() {
         Properties props = new Properties();
@@ -39,23 +39,23 @@ public final class ProducerApp {
         // (The value one comes from io.confluent:kafka-json-serializer and
         // needs no registry - it is a thin Jackson wrapper.)
 
-        // Reliability: what has to be true before the broker confirms a write,
-        // and what stops a retry from creating a duplicate?
+        // Reliability - we get to this in the reliability lab: what has to be
+        // true before the broker confirms a write, and what stops a retry from
+        // creating a duplicate?
 
-        // Throughput: how long may the producer collect before sending, how
-        // much may it collect, and should it compress?
+        // Throughput - we get to this in the performance lab: how long may the
+        // producer collect before sending, how much may it collect, and should
+        // it compress?
 
         return props;
     }
 
     private static final Logger log = LoggerFactory.getLogger(ProducerApp.class);
 
-    private static final String BOOTSTRAP_SERVERS =
-            env("BOOTSTRAP_SERVERS", "localhost:9092,localhost:9093,localhost:9094");
-    private static final String TOPIC =
-            env("TOPIC", "nordwind.scada.public.turbine-telemetry.event");
-    /** How often every turbine reports, in milliseconds. */
-    private static final long TICK_INTERVAL_MS = Long.parseLong(env("TICK_INTERVAL_MS", "1000"));
+    private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
+    private static final String TOPIC = "nordwind.scada.public.turbine-telemetry.event";
+    /** How often every turbine reports, in milliseconds. 0 removes the brake. */
+    private static final long TICK_INTERVAL_MS = 1000;
 
     /** Set by the delivery callback when a send has failed for good. */
     private static final AtomicBoolean fatalError = new AtomicBoolean(false);
@@ -110,12 +110,12 @@ public final class ProducerApp {
                     // ProducerRecord<?, ?> record = new ProducerRecord<>(TOPIC, ??, measurement);
                     // producer.send(record);
                     //
-                    // TODO 4: pass a callback as the second argument to send().
-                    // It runs when the broker acknowledged, or when delivery
-                    // failed for good - by then the client has already
-                    // exhausted its internal retries. What now? The lab text
-                    // has three options and one anti-pattern; for "stop",
-                    // call giveUp() below.
+                    // TODO 4 - in the reliability lab: pass a callback as the
+                    // second argument to send(). It runs when the broker
+                    // acknowledged, or when delivery failed for good - by then
+                    // the client has already exhausted its internal retries.
+                    // What now? The lab text has three options and one
+                    // anti-pattern; for "stop", call giveUp() below.
                     //
                     // producer.send(record, (metadata, exception) -> {
                     //     if (exception != null) {
@@ -181,11 +181,6 @@ public final class ProducerApp {
         } catch (UnknownHostException e) {
             return "unknown-host";
         }
-    }
-
-    private static String env(String name, String defaultValue) {
-        String value = System.getenv(name);
-        return value != null && !value.isBlank() ? value : defaultValue;
     }
 
     private ProducerApp() {
