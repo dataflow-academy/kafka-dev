@@ -2,10 +2,11 @@ package academy.dataflow.wind.producer;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.kafka.clients.producer.Producer;
 import org.slf4j.Logger;
@@ -24,57 +25,67 @@ public final class ProducerApp {
     /**
      * The producer configuration.
      *
-     * <p>TODO 1: fill this in. The lab text tells you which questions each
-     * group of settings answers. For every line you add, know what it costs
-     * you - "it is the default" is not an answer.
+     * <p>TODO 1: fill this in, one group per lab. The lab text tells you
+     * which questions each group of settings answers.
      */
     private static Properties producerConfig() {
         Properties props = new Properties();
         props.put("bootstrap.servers", BOOTSTRAP_SERVERS);
+        // Makes this producer identifiable in broker logs, metrics and quotas.
+        props.put("client.id", hostname());
 
         // Serialization: the key is a plain string, the value is a
         // WindTurbineMeasurement. Which serializers do you need?
         // (The value one comes from io.confluent:kafka-json-serializer and
         // needs no registry - it is a thin Jackson wrapper.)
 
-        // Reliability: what has to be true before the broker confirms a write,
-        // and what stops a retry from creating a duplicate?
+        // Reliability - we get to this in the reliability lab: what has to be
+        // true before the broker confirms a write, and what stops a retry from
+        // creating a duplicate?
 
-        // Throughput: how long may the producer collect before sending, how
-        // much may it collect, and should it compress?
-
-        // Operations: which value makes this producer identifiable in broker
-        // logs, metrics and quotas? hostname() at the bottom gives you one.
+        // Throughput - we get to this in the performance lab: how long may the
+        // producer collect before sending, how much may it collect, and should
+        // it compress?
 
         return props;
     }
 
     private static final Logger log = LoggerFactory.getLogger(ProducerApp.class);
 
-    private static final String BOOTSTRAP_SERVERS =
-            env("BOOTSTRAP_SERVERS", "localhost:9092,localhost:9093,localhost:9094");
-    private static final String TOPIC =
-            env("TOPIC", "nordwind.scada.public.turbine-telemetry.event");
-    /** How often every turbine reports, in milliseconds. */
-    private static final long TICK_INTERVAL_MS = Long.parseLong(env("TICK_INTERVAL_MS", "1000"));
+    private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
+    private static final String TOPIC = "nordwind.scada.public.turbine-telemetry.event";
+    /**
+     * How often every turbine reports, in milliseconds. 0 removes the brake
+     * and turns a run into a measurement that stops after MEASURE_SECONDS.
+     */
+    private static final long TICK_INTERVAL_MS = 1000;
+    private static final long MEASURE_SECONDS = 120;
 
     /** Set by the delivery callback when a send has failed for good. */
     private static final AtomicBoolean fatalError = new AtomicBoolean(false);
     private static volatile boolean running = true;
+    /** Counted down once the producer is closed. */
+    private static final CountDownLatch stopped = new CountDownLatch(1);
 
     public static void main(String[] args) throws InterruptedException {
-        // Ctrl+C does not kill the JVM on the spot: the hook below ends the
-        // loop and waits until close() has flushed what is still buffered.
-        installShutdownHook();
-
         WindParkSimulator simulator = new WindParkSimulator();
         long produced = 0;
         long startedAt = System.currentTimeMillis();
+        long lastReport = startedAt;
 
         // TODO 2: create the producer and replace both '?' with the right
         // types. Look at what you are sending and at the serializers you
         // configured in TODO 1 - they have to match.
         Producer<?, ?> producer = null; // new KafkaProducer<>(producerConfig())
+
+        if (producer == null) {
+            log.error("No producer yet - TODO 2 is still open. See the lab text.");
+            System.exit(1);
+        }
+
+        // Ctrl+C does not kill the JVM on the spot: the hook below ends the
+        // loop and waits until close() has flushed what is still buffered.
+        installShutdownHook();
 
         // try-with-resources: close() flushes everything still buffered.
         // A producer that is not closed loses whatever sits in its batches.
@@ -84,6 +95,9 @@ public final class ProducerApp {
 
             while (running && !fatalError.get()) {
                 long tickStart = System.currentTimeMillis();
+                if (TICK_INTERVAL_MS == 0 && tickStart - startedAt >= MEASURE_SECONDS * 1000) {
+                    break;
+                }
 
                 List<WindTurbineMeasurement> measurements = simulator.nextTick(Instant.now());
                 for (WindTurbineMeasurement measurement : measurements) {
@@ -102,12 +116,12 @@ public final class ProducerApp {
                     // ProducerRecord<?, ?> record = new ProducerRecord<>(TOPIC, ??, measurement);
                     // producer.send(record);
                     //
-                    // TODO 4: pass a callback as the second argument to send().
-                    // It runs when the broker acknowledged, or when delivery
-                    // failed for good - by then the client has already
-                    // exhausted its internal retries. What now? The lab text
-                    // has three options and one anti-pattern; for "stop",
-                    // call giveUp() below.
+                    // TODO 4 - in the reliability lab: pass a callback as the
+                    // second argument to send(). It runs when the broker
+                    // acknowledged, or when delivery failed for good - by then
+                    // the client has already exhausted its internal retries.
+                    // What now? The lab text has three options and one
+                    // anti-pattern; for "stop", call giveUp() below.
                     //
                     // producer.send(record, (metadata, exception) -> {
                     //     if (exception != null) {
@@ -118,9 +132,10 @@ public final class ProducerApp {
                     produced++;
                 }
 
-                if (produced % (measurements.size() * 30L) == 0) {
-                    long seconds = Math.max(1, (System.currentTimeMillis() - startedAt) / 1000);
-                    log.info("Produced {} measurements so far ({} msg/s)", produced, produced / seconds);
+                long now = System.currentTimeMillis();
+                if (now - lastReport >= 5000) {
+                    logProgress(producer, (now - lastReport) / 1000.0);
+                    lastReport = now;
                 }
 
                 // Keep a steady tick rate regardless of how long sending took.
@@ -129,7 +144,13 @@ public final class ProducerApp {
                     Thread.sleep(sleep);
                 }
             }
+
+            // Flush first, so the summary covers every record, not just the
+            // ones that happened to be acknowledged when the loop ended.
+            producer.flush();
+            logSummary(producer, System.currentTimeMillis() - startedAt);
         }
+        stopped.countDown();
 
         if (fatalError.get()) {
             log.error("Exiting due to a fatal delivery error (see log above)");
@@ -138,13 +159,59 @@ public final class ProducerApp {
         log.info("Producer stopped cleanly after {} measurements", produced);
     }
 
+    private static double lastRecords;
+    private static double lastBytes;
+
+    /**
+     * Throughput since the last report and latency of the last 30 to 60
+     * seconds, in the style of kafka-producer-perf-test. The numbers come from
+     * the producer's own metrics, so they count what was actually sent, not
+     * what was handed to send().
+     */
+    private static void logProgress(Producer<?, ?> producer, double seconds) {
+        double records = metric(producer, "record-send-total");
+        double bytes = metric(producer, "outgoing-byte-total");
+        double queued = metric(producer, "record-queue-time-avg");
+        double request = metric(producer, "request-latency-avg");
+        log.info(String.format("%.0f records/sec (%.2f MB/sec on the wire), latency avg %.1f ms (%.1f queued + %.1f request), max %.0f ms",
+                (records - lastRecords) / seconds,
+                (bytes - lastBytes) / 1_000_000 / seconds,
+                queued + request, queued, request,
+                metric(producer, "record-queue-time-max") + metric(producer, "request-latency-max")));
+        lastRecords = records;
+        lastBytes = bytes;
+    }
+
+    private static void logSummary(Producer<?, ?> producer, long elapsedMs) {
+        double seconds = Math.max(1, elapsedMs) / 1000.0;
+        double records = metric(producer, "record-send-total");
+        log.info(String.format("%.0f records sent in %.0f s, %.0f records/sec (%.2f MB/sec on the wire)",
+                records, seconds, records / seconds, metric(producer, "outgoing-byte-total") / 1_000_000 / seconds));
+        log.info(String.format("batches: avg %.0f bytes, %.1f records per request, compressed to %.0f %%",
+                metric(producer, "batch-size-avg"),
+                metric(producer, "records-per-request-avg"),
+                metric(producer, "compression-rate-avg") * 100));
+    }
+
+    private static double metric(Producer<?, ?> producer, String name) {
+        for (var entry : producer.metrics().entrySet()) {
+            if (entry.getKey().group().equals("producer-metrics") && entry.getKey().name().equals(name)) {
+                Object value = entry.getValue().metricValue();
+                return value instanceof Number n && Double.isFinite(n.doubleValue()) ? n.doubleValue() : 0;
+            }
+        }
+        return 0;
+    }
+
     private static void installShutdownHook() {
-        final Thread mainThread = Thread.currentThread();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (stopped.getCount() == 0) {
+                return; // the loop has already ended, e.g. after giveUp()
+            }
             log.info("Shutdown signal received, stopping producer ...");
             running = false;
             try {
-                mainThread.join(Duration.ofSeconds(15).toMillis());
+                stopped.await(15, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
@@ -170,11 +237,6 @@ public final class ProducerApp {
         } catch (UnknownHostException e) {
             return "unknown-host";
         }
-    }
-
-    private static String env(String name, String defaultValue) {
-        String value = System.getenv(name);
-        return value != null && !value.isBlank() ? value : defaultValue;
     }
 
     private ProducerApp() {
