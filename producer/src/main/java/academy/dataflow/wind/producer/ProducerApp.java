@@ -54,8 +54,13 @@ public final class ProducerApp {
 
     private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
     private static final String TOPIC = "nordwind.scada.public.turbine-telemetry.event";
-    /** How often every turbine reports, in milliseconds. 0 removes the brake. */
+    /**
+     * How often every turbine reports, in milliseconds. 0 removes the brake
+     * and turns a run into a measurement that stops after MEASURE_SECONDS.
+     */
     private static final long TICK_INTERVAL_MS = 1000;
+    /** Unbraked, a producer fills gigabytes of disk per minute. */
+    private static final long MEASURE_SECONDS = 30;
 
     /** Set by the delivery callback when a send has failed for good. */
     private static final AtomicBoolean fatalError = new AtomicBoolean(false);
@@ -67,6 +72,7 @@ public final class ProducerApp {
         WindParkSimulator simulator = new WindParkSimulator();
         long produced = 0;
         long startedAt = System.currentTimeMillis();
+        long lastReport = startedAt;
 
         // TODO 2: create the producer and replace both '?' with the right
         // types. Look at what you are sending and at the serializers you
@@ -92,6 +98,9 @@ public final class ProducerApp {
 
             while (running && !fatalError.get()) {
                 long tickStart = System.currentTimeMillis();
+                if (TICK_INTERVAL_MS == 0 && tickStart - startedAt >= MEASURE_SECONDS * 1000) {
+                    break;
+                }
 
                 List<WindTurbineMeasurement> measurements = simulator.nextTick(Instant.now());
                 for (WindTurbineMeasurement measurement : measurements) {
@@ -126,9 +135,11 @@ public final class ProducerApp {
                     produced++;
                 }
 
-                if (produced % (measurements.size() * 30L) == 0) {
-                    long seconds = Math.max(1, (System.currentTimeMillis() - startedAt) / 1000);
-                    log.info("Produced {} measurements so far ({} msg/s)", produced, produced / seconds);
+                long now = System.currentTimeMillis();
+                if (now - lastReport >= 5000) {
+                    lastReport = now;
+                    log.info("Produced {} measurements so far ({} msg/s)",
+                            produced, produced * 1000 / (now - startedAt));
                 }
 
                 // Keep a steady tick rate regardless of how long sending took.
@@ -144,7 +155,9 @@ public final class ProducerApp {
             log.error("Exiting due to a fatal delivery error (see log above)");
             System.exit(1);
         }
-        log.info("Producer stopped cleanly after {} measurements", produced);
+        long elapsed = Math.max(1, System.currentTimeMillis() - startedAt);
+        log.info("Producer stopped cleanly after {} measurements in {} s ({} msg/s, close() included)",
+                produced, elapsed / 1000, produced * 1000 / elapsed);
     }
 
     private static void installShutdownHook() {
