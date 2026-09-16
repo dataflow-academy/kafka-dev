@@ -26,12 +26,13 @@ public final class ProducerApp {
      * The producer configuration.
      *
      * <p>TODO 1: fill this in. The lab text tells you which questions each
-     * group of settings answers. For every line you add, know what it costs
-     * you - "it is the default" is not an answer.
+     * group of settings answers.
      */
     private static Properties producerConfig() {
         Properties props = new Properties();
         props.put("bootstrap.servers", BOOTSTRAP_SERVERS);
+        // Makes this producer identifiable in broker logs, metrics and quotas.
+        props.put("client.id", hostname());
 
         // Serialization: the key is a plain string, the value is a
         // WindTurbineMeasurement. Which serializers do you need?
@@ -43,9 +44,6 @@ public final class ProducerApp {
 
         // Throughput: how long may the producer collect before sending, how
         // much may it collect, and should it compress?
-
-        // Operations: which value makes this producer identifiable in broker
-        // logs, metrics and quotas? hostname() at the bottom gives you one.
 
         return props;
     }
