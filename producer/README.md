@@ -26,13 +26,4 @@ Expects a Kafka cluster on `localhost:9092,9093,9094` and the topic
 | `TOPIC` | `nordwind.scada.public.turbine-telemetry.event` |
 | `TICK_INTERVAL_MS` | `1000` — `0` removes the rate limit, which is what the throughput task needs |
 
-Java 25 or newer, same as the training VM and the dev templates. The build
-targets 25 via `options.release` rather than a toolchain, so it uses the JDK
-that is already installed instead of demanding a specific one.
-
-## Where this leads
-
-This is the training version of `java/producer-json` in the dev templates: same
-data model, same wire format, same settings. The template adds what a lab does
-not need — configuration from the environment, a Dockerfile, and a README that
-explains every setting in place.
+Java 25 or newer.

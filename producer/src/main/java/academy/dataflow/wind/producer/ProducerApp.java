@@ -21,6 +21,34 @@ import org.slf4j.LoggerFactory;
  */
 public final class ProducerApp {
 
+    /**
+     * The producer configuration.
+     *
+     * <p>TODO 1: fill this in. The lab text tells you which questions each
+     * group of settings answers. For every line you add, know what it costs
+     * you - "it is the default" is not an answer.
+     */
+    private static Properties producerConfig() {
+        Properties props = new Properties();
+        props.put("bootstrap.servers", BOOTSTRAP_SERVERS);
+
+        // Serialization: the key is a plain string, the value is a
+        // WindTurbineMeasurement. Which serializers do you need?
+        // (The value one comes from io.confluent:kafka-json-serializer and
+        // needs no registry - it is a thin Jackson wrapper.)
+
+        // Reliability: what has to be true before the broker confirms a write,
+        // and what stops a retry from creating a duplicate?
+
+        // Throughput: how long may the producer collect before sending, how
+        // much may it collect, and should it compress?
+
+        // Operations: which value makes this producer identifiable in broker
+        // logs, metrics and quotas? hostname() at the bottom gives you one.
+
+        return props;
+    }
+
     private static final Logger log = LoggerFactory.getLogger(ProducerApp.class);
 
     private static final String BOOTSTRAP_SERVERS =
@@ -35,26 +63,18 @@ public final class ProducerApp {
     private static volatile boolean running = true;
 
     public static void main(String[] args) throws InterruptedException {
+        // Ctrl+C does not kill the JVM on the spot: the hook below ends the
+        // loop and waits until close() has flushed what is still buffered.
         installShutdownHook();
 
         WindParkSimulator simulator = new WindParkSimulator();
         long produced = 0;
         long startedAt = System.currentTimeMillis();
 
-        // TODO 2: create the producer.
-        //
-        // Producer<?, ?> producer = new KafkaProducer<>(producerConfig());
-        //
-        // What are the two type parameters? Look at what you are sending and
-        // at the serializers you configured in TODO 1 - they have to match.
-        Producer<String, WindTurbineMeasurement> producer = null;
-
-        // Delete this guard once TODO 2 is done. Without it the loop would run
-        // happily and report progress while nothing reaches Kafka.
-        if (producer == null) {
-            log.error("No producer yet - TODO 2 is still open. See the lab text.");
-            System.exit(1);
-        }
+        // TODO 2: create the producer and replace both '?' with the right
+        // types. Look at what you are sending and at the serializers you
+        // configured in TODO 1 - they have to match.
+        Producer<?, ?> producer = null; // new KafkaProducer<>(producerConfig())
 
         // try-with-resources: close() flushes everything still buffered.
         // A producer that is not closed loses whatever sits in its batches.
@@ -79,16 +99,19 @@ public final class ProducerApp {
                     //    future per message - that turns every send into a
                     //    network round trip and destroys batching.
                     //
-                    // c) Pass a callback as the second argument. It runs when
-                    //    the broker acknowledged, or when delivery failed for
-                    //    good.
-                    //
                     // ProducerRecord<?, ?> record = new ProducerRecord<>(TOPIC, ??, measurement);
+                    // producer.send(record);
+                    //
+                    // TODO 4: pass a callback as the second argument to send().
+                    // It runs when the broker acknowledged, or when delivery
+                    // failed for good - by then the client has already
+                    // exhausted its internal retries. What now? The lab text
+                    // has three options and one anti-pattern; for "stop",
+                    // call giveUp() below.
+                    //
                     // producer.send(record, (metadata, exception) -> {
                     //     if (exception != null) {
-                    //         // TODO 4: by the time you see this, the client has
-                    //         // already exhausted its internal retries. What now?
-                    //         // The lab text has three options and one anti-pattern.
+                    //         ...
                     //     }
                     // });
 
@@ -113,34 +136,6 @@ public final class ProducerApp {
             System.exit(1);
         }
         log.info("Producer stopped cleanly after {} measurements", produced);
-    }
-
-    /**
-     * The producer configuration.
-     *
-     * <p>TODO 1: fill this in. The lab text tells you which questions each
-     * group of settings answers. For every line you add, know what it costs
-     * you - "it is the default" is not an answer.
-     */
-    private static Properties producerConfig() {
-        Properties props = new Properties();
-        props.put("bootstrap.servers", BOOTSTRAP_SERVERS);
-
-        // Serialization: the key is a plain string, the value is a
-        // WindTurbineMeasurement. Which serializers do you need?
-        // (The value one comes from io.confluent:kafka-json-serializer and
-        // needs no registry - it is a thin Jackson wrapper.)
-
-        // Reliability: what has to be true before the broker confirms a write,
-        // and what stops a retry from creating a duplicate?
-
-        // Throughput: how long may the producer collect before sending, how
-        // much may it collect, and should it compress?
-
-        // Operations: which value makes this producer identifiable in broker
-        // logs, metrics and quotas?
-
-        return props;
     }
 
     private static void installShutdownHook() {

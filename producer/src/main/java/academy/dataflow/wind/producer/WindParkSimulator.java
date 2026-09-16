@@ -11,17 +11,14 @@ import java.util.Random;
  * Simulates a fleet of 50 wind turbines across 5 wind parks with plausible
  * physics.
  *
- * <p>NOTE: this class is intentionally duplicated into every producer template
- * so each template stays fully self-contained (copy one directory and it
- * builds). It is demo scaffolding, not part of the Kafka patterns being
- * demonstrated.
+ * <p>Demo scaffolding, not part of the Kafka patterns being practised.
  *
  * <p>The model, in brief:
  * <ul>
  *   <li><b>Wind</b>: each park has its own wind speed following a bounded
  *       random walk; turbines in the same park see the park wind plus a small
  *       local jitter. Correlated wind is what makes park-level aggregations
- *       (a later template) meaningful.</li>
+ *       (a later lab) meaningful.</li>
  *   <li><b>Power curve</b>: 0 below the cut-in speed (3 m/s), a cubic ramp up
  *       to the rated wind speed (12 m/s) - power in the ramp grows with the
  *       cube of the wind speed - then rated power until the cut-out speed
@@ -57,13 +54,12 @@ final class WindParkSimulator {
      * <p>Real offshore parks are built out with a single turbine model, so
      * rated power is a property of the park, not a per-turbine coin flip. That
      * is also what makes this table a CONTRACT rather than decoration: the
-     * master-data template (python/masterdata-producer, fleet.py) publishes
-     * exactly these numbers as {@code rated_power_kw} into the turbine
-     * registry, and the enrichment templates divide the measured power by them
-     * to get a capacity factor. Roll the rated power randomly here and that
+     * turbine master data carries exactly these numbers as
+     * {@code rated_power_kw}, and a join divides the measured power by them to
+     * get a capacity factor. Roll the rated power randomly here and that
      * capacity factor exceeds 1.0 - a physically impossible number, produced
      * by a join whose two sides disagree about the world. Change a value here,
-     * change it in fleet.py.
+     * change it in the master data too.
      *
      * <p>The models behind the numbers (the real machines in these parks):
      * <pre>
