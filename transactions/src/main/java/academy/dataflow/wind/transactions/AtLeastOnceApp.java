@@ -110,6 +110,7 @@ public final class AtLeastOnceApp {
         }, "shutdown-hook"));
 
         BookingSupport.Progress progress = new BookingSupport.Progress();
+        boolean todoOpen = false;
         try (consumer; producer) {
             consumer.subscribe(List.of(TRANSFERS_TOPIC));
             log.info("Booking '{}' -> '{}' and '{}' (group: {}, halt at transfer: {})",
@@ -119,8 +120,9 @@ public final class AtLeastOnceApp {
             while (running) {
                 ConsumerRecords<String, BankTransfer> records = consumer.poll(Duration.ofMillis(500));
                 if (records.isEmpty()) {
-                    if (progress.idle()) {
-                        checkScaffold(consumer, producer, progress.total());
+                    if (progress.idle() && !checkScaffold(consumer, producer, progress.total())) {
+                        todoOpen = true;
+                        break;
                     }
                     continue;
                 }
@@ -155,11 +157,16 @@ public final class AtLeastOnceApp {
         } finally {
             stopped.countDown();
         }
+        if (todoOpen) {
+            // Only now: close() above has left the group, so the next start
+            // does not wait for this consumer's session to time out.
+            System.exit(1);
+        }
         log.info("Stopped after booking {} transfers", progress.total());
     }
 
-    /** Stops the scaffold from looking like it works while TODOs are open. */
-    private static void checkScaffold(Consumer<?, ?> consumer, Producer<?, ?> producer, long booked) {
+    /** Stops the scaffold from looking like it works while TODOs are open. Returns false if one is. */
+    private static boolean checkScaffold(Consumer<?, ?> consumer, Producer<?, ?> producer, long booked) {
         producer.flush();
         double sent = producer.metrics().entrySet().stream()
                 .filter(e -> e.getKey().group().equals("producer-metrics")
@@ -168,16 +175,15 @@ public final class AtLeastOnceApp {
                 .sum();
         if (booked > 0 && sent == 0) {
             log.error("{} transfers processed, but not a single booking sent - TODO 2 is still open.", booked);
-            running = false;
-            System.exit(1);
+            return false;
         }
         Map<TopicPartition, OffsetAndMetadata> committed = consumer.committed(consumer.assignment());
         if (committed.values().stream().allMatch(Objects::isNull)) {
             log.error("{} transfers booked, but no offset committed - TODO 3 is still open. "
                     + "Every restart would book everything again.", booked);
-            running = false;
-            System.exit(1);
+            return false;
         }
+        return true;
     }
 
     private AtLeastOnceApp() {
