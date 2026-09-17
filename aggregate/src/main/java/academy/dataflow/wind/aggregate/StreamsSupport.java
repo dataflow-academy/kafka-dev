@@ -36,6 +36,7 @@ final class StreamsSupport {
         props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, applicationId);
         props.put(StreamsConfig.CLIENT_ID_CONFIG, hostname());
+        props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG, 3);
         props.put(StreamsConfig.STATE_DIR_CONFIG, stateDir);
         // Kafka Streams keeps a stopped instance in its group until the
         // session times out (45 s), and a restart waits for that. This
@@ -102,11 +103,20 @@ final class StreamsSupport {
         });
 
         CountDownLatch shutdownRequested = new CountDownLatch(1);
+        Thread main = Thread.currentThread();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (stopped.getCount() == 0) {
+                return; // Kafka Streams has already stopped on its own
+            }
             log.info("Shutdown signal received, closing Kafka Streams ...");
             shutdownRequested.countDown();
             // close() commits what is in flight.
             streams.close(Duration.ofSeconds(30));
+            try {
+                main.join(5000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }, "shutdown-hook"));
 
         streams.start();

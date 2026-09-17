@@ -23,8 +23,8 @@ import org.slf4j.LoggerFactory;
  * park, to compacted topics. Runs once and exits; running it again is
  * harmless, compaction keeps the latest value per key.
  *
- * <p>This stands in for the asset team's master data service, which is
- * written in Python. It is not part of the exercise - but it behaves like the
+ * <p>This stands in for the Python script asset management uses to publish
+ * the master data. It is not part of the exercise - but it behaves like the
  * real thing, see {@link #producerConfig()}.
  */
 public final class RegistryPublisher {
@@ -60,14 +60,15 @@ public final class RegistryPublisher {
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaJsonSerializer.class);
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-        // The asset team's service runs the Python client with its defaults.
+        // Asset management's script runs the Python client with its defaults.
         props.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, PythonDefaultPartitioner.class);
         return props;
     }
 
     public static void main(String[] args) throws InterruptedException, ExecutionException {
-        boolean withParks = topicExists(PARK_REGISTRY_TOPIC);
-        if (!topicExists(TURBINE_REGISTRY_TOPIC)) {
+        Set<String> topics = existingTopics();
+        boolean withParks = topics.contains(PARK_REGISTRY_TOPIC);
+        if (!topics.contains(TURBINE_REGISTRY_TOPIC)) {
             log.error("Topic '{}' is missing - create it first, see the lab text.", TURBINE_REGISTRY_TOPIC);
             System.exit(1);
         }
@@ -105,12 +106,15 @@ public final class RegistryPublisher {
         }
     }
 
-    private static boolean topicExists(String topic) throws InterruptedException, ExecutionException {
+    private static Set<String> existingTopics() throws InterruptedException {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         try (Admin admin = Admin.create(props)) {
-            Set<String> names = admin.listTopics().names().get();
-            return names.contains(topic);
+            return admin.listTopics().names().get();
+        } catch (ExecutionException e) {
+            log.error("Cannot reach Kafka at {}: {}", BOOTSTRAP_SERVERS, e.getCause().toString());
+            System.exit(1);
+            return Set.of();
         }
     }
 
