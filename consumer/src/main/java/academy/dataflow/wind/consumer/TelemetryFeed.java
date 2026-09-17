@@ -1,5 +1,6 @@
 package academy.dataflow.wind.consumer;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
