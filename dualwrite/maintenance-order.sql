@@ -1,6 +1,7 @@
 -- The maintenance planning service and its table. Running this file again
 -- starts from scratch.
 
+\set ON_ERROR_STOP on
 SET client_min_messages = warning;
 
 DO $$

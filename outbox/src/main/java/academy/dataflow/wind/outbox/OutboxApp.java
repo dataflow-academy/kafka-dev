@@ -18,8 +18,9 @@ import org.slf4j.LoggerFactory;
  * to the table maintenance_order, and the event for it to the outbox table.
  * Debezium takes it from there. This service does not know Kafka.
  *
- * <p>Two things are yours: the INSERT into your outbox table (TODO 1) and,
- * later in the lab, the transaction around both writes (TODO 2).
+ * <p>Two things are yours: the INSERT into your outbox table (TODO 2) and,
+ * later in the lab, the transaction around both writes (TODO 3). TODO 1 is
+ * the outbox table itself, in outbox.sql.
  */
 public final class OutboxApp {
 
@@ -34,7 +35,7 @@ public final class OutboxApp {
     private static final String AGGREGATE_TYPE = "maintenance-order";
     private static final String EVENT_TYPE = "MaintenanceOrderScheduled";
 
-    /** Time between the two writes, as in the dual write demo. */
+    /** Time between the two writes, as in the dual write lab. */
     private static final long WORK_BETWEEN_WRITES_MS = 800;
     private static final long PAUSE_BETWEEN_ORDERS_MS = 200;
 
@@ -45,7 +46,7 @@ public final class OutboxApp {
         MaintenancePlanner planner = new MaintenancePlanner();
 
         try (Connection db = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD)) {
-            // TODO 2 (later in the lab): what has to change so that an order
+            // TODO 3 (later in the lab): what has to change so that an order
             // and its event are committed together - or not at all?
 
             if (!outboxInsertWorks(db, planner.next())) {
@@ -65,7 +66,7 @@ public final class OutboxApp {
                 Thread.sleep(WORK_BETWEEN_WRITES_MS);
                 insertEvent(db, order);
                 log.info("{}: event written", name);
-                // TODO 2, continued
+                // TODO 3, continued
 
                 orders++;
                 Thread.sleep(PAUSE_BETWEEN_ORDERS_MS);
@@ -90,7 +91,7 @@ public final class OutboxApp {
     /**
      * Writes the event for one order into the outbox table.
      *
-     * <p>TODO 1: insert one row into the outbox table you created. The
+     * <p>TODO 2: insert one row into the outbox table you created. The
      * Event Router needs to know which topic the event goes to
      * (AGGREGATE_TYPE), which key it gets, what kind of event it is
      * (EVENT_TYPE) and the payload. Which value belongs in the key?
@@ -105,11 +106,11 @@ public final class OutboxApp {
         //     stmt.executeUpdate();
         // }
 
-        throw new IllegalStateException("TODO 1 is still open - see the lab text.");
+        throw new IllegalStateException("TODO 2 is still open - see the lab text.");
     }
 
     /**
-     * Tries TODO 1 once and rolls it back, so a missing or broken outbox
+     * Tries TODO 2 once and rolls it back, so a missing or broken outbox
      * insert stops the app before it writes a single order.
      */
     private static boolean outboxInsertWorks(Connection db, MaintenanceOrder probe) throws SQLException {

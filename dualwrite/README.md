@@ -1,10 +1,13 @@
-# Dual write demo
+# Dual write lab
 
 A maintenance planning service that writes every new order to Postgres and
-sends it to Kafka - two writes without a transaction around both.
+sends it to Kafka — two writes without a transaction around both.
 
 Nothing to fill in. Run it, kill it between the two writes, and compare the
-table with the topic. The lab text on the training platform has the steps.
+table with the topic.
+
+The lab text on the training platform has the tasks, the hints and the
+solutions.
 
 ## Run
 

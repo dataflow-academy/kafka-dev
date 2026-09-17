@@ -18,10 +18,10 @@ CREATE TABLE turbine_registry (
 INSERT INTO turbine_registry (wind_turbine_id, wind_park_id, manufacturer, model, rated_power_kw)
 SELECT format('%s-%s', park, to_char(n, 'FM00')), park, manufacturer, model, rated_power_kw
 FROM (VALUES
-        (1, 'alpha-ventus',     12, 'AREVA',          'M5000-116',   5000),
+        (1, 'alpha-ventus',     12, 'AREVA Wind',     'M5000-116',   5000),
         (2, 'nordsee-ost',      15, 'Senvion',        '6.2M126',     6200),
-        (3, 'borkum-riffgrund', 10, 'Siemens',        'SWT-4.0-120', 4000),
-        (4, 'arkona',            8, 'Siemens',        'SWT-6.0-154', 6000),
+        (3, 'borkum-riffgrund', 10, 'Siemens Gamesa', 'SWT-4.0-120', 4000),
+        (4, 'arkona',            8, 'Siemens Gamesa', 'SWT-6.0-154', 6000),
         (5, 'baltic-eagle',      5, 'Vestas',         'V164-7.0',    7000)
      ) AS parks (pos, park, turbines, manufacturer, model, rated_power_kw)
 CROSS JOIN LATERAL generate_series(1, turbines) AS n

@@ -5,10 +5,10 @@ order goes into the table `maintenance_order`, its event into the table
 `outbox`, and Debezium's Event Router turns the outbox into a Kafka topic.
 The service itself does not talk to Kafka.
 
-Two TODOs in
+Three TODOs: the outbox table in [`outbox.sql`](outbox.sql) (TODO 1), the
+insert into it and the transaction around both writes in
 [`OutboxApp.java`](src/main/java/academy/dataflow/wind/outbox/OutboxApp.java)
-and one in [`outbox.sql`](outbox.sql): the outbox table, the insert into it,
-and the transaction around both writes. The connector configuration
+(TODO 2 and 3). The connector configuration
 [`outbox-connector.json`](outbox-connector.json) still lacks the Event Router.
 
 The lab text on the training platform has the tasks, the hints and the

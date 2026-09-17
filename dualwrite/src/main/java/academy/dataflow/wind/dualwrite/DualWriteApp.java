@@ -30,7 +30,7 @@ public final class DualWriteApp {
     private static final Logger log = LoggerFactory.getLogger(DualWriteApp.class);
 
     private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
-    private static final String TOPIC = "nordwind.dualwrite.private.maintenance-order.event";
+    private static final String TOPIC = "nordwind.maintenance.private.maintenance-order.event";
     private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/user";
     private static final String DB_USER = "planning";
     private static final String DB_PASSWORD = "planning";
