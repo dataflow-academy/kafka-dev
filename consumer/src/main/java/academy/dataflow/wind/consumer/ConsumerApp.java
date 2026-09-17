@@ -4,8 +4,9 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.Collection;
-import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
@@ -37,7 +38,7 @@ public final class ConsumerApp {
         // Makes this consumer identifiable in broker logs, metrics and quotas.
         props.put(ConsumerConfig.CLIENT_ID_CONFIG, hostname());
         // The rebalance protocol with broker-side assignment. Use it from
-        // Kafka 4.1 on; anything else is legacy.
+        // Kafka 4.0 on; anything else is legacy.
         props.put(ConsumerConfig.GROUP_PROTOCOL_CONFIG, "consumer");
         // Never read records of open or aborted transactions. Costs nothing
         // without transactions, so set it always.
@@ -63,6 +64,8 @@ public final class ConsumerApp {
     private static final Duration POLL_TIMEOUT = Duration.ofSeconds(1);
 
     private static volatile boolean running = true;
+    /** Counted down once the consumer is closed. */
+    private static final CountDownLatch stopped = new CountDownLatch(1);
 
     public static void main(String[] args) {
         ParkOverview overview = new ParkOverview(GROUP_ID);
@@ -78,14 +81,21 @@ public final class ConsumerApp {
 
         installShutdownHook(consumer);
 
+        boolean todoOpen = false;
         try {
             // TODO 3: subscribe to TOPIC. Pass new LoggingRebalanceListener(overview)
             // as the second argument, so you see which partitions this
             // instance gets.
 
-            log.info("Reading '{}' as group '{}' (bootstrap: {})", TOPIC, GROUP_ID, BOOTSTRAP_SERVERS);
+            if (consumer.subscription().isEmpty()) {
+                log.error("Not subscribed yet - TODO 3 is still open. See the lab text.");
+                todoOpen = true;
+            } else {
+                log.info("Reading '{}' as group '{}' (bootstrap: {})", TOPIC, GROUP_ID, BOOTSTRAP_SERVERS);
+            }
 
-            while (running) {
+            boolean firstRound = true;
+            while (running && !todoOpen) {
                 try {
                     // TODO 4: poll with POLL_TIMEOUT and hand every record to
                     // overview.add(record).
@@ -99,6 +109,12 @@ public final class ConsumerApp {
                     // cannot be deserialized. Your group's decision goes here.
                     throw e;
                 }
+                if (firstRound && !hasPolled(consumer)) {
+                    log.error("No poll() yet - TODO 4 is still open. See the lab text.");
+                    todoOpen = true;
+                    break;
+                }
+                firstRound = false;
                 overview.pollDone();
             }
         } catch (WakeupException e) {
@@ -108,7 +124,18 @@ public final class ConsumerApp {
             // group at once, instead of making it wait for a timeout.
             consumer.close();
             log.info("Consumer closed");
+            stopped.countDown();
         }
+        if (todoOpen) {
+            System.exit(1);
+        }
+    }
+
+    /** True once poll() has been called: the metric is -1 before that. */
+    private static boolean hasPolled(Consumer<?, ?> consumer) {
+        return consumer.metrics().entrySet().stream()
+                .filter(e -> e.getKey().name().equals("last-poll-seconds-ago"))
+                .anyMatch(e -> ((Number) e.getValue().metricValue()).doubleValue() >= 0);
     }
 
     /**
@@ -117,13 +144,15 @@ public final class ConsumerApp {
      * and waits until main() has closed the consumer.
      */
     private static void installShutdownHook(Consumer<?, ?> consumer) {
-        Thread mainThread = Thread.currentThread();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (stopped.getCount() == 0) {
+                return; // main() has already ended, e.g. after an exception
+            }
             log.info("Shutdown signal received, stopping consumer ...");
             running = false;
             consumer.wakeup();
             try {
-                mainThread.join(Duration.ofSeconds(15));
+                stopped.await(15, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
