@@ -16,6 +16,9 @@ import org.apache.kafka.streams.TopologyDescription;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
+import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.Repartitioned;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
