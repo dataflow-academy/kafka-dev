@@ -6,6 +6,8 @@ by partition and offset.
 Nothing to fill in. If it runs, Java, the build and the connection to Kafka
 all work.
 
+The lab text on the training platform has the tasks and the background.
+
 ## Run
 
 ```bash
