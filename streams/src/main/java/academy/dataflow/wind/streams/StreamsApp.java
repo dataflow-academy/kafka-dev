@@ -41,6 +41,8 @@ public final class StreamsApp {
      * start of this run). 0 = never.
      */
     private static final long HALT_AT_TRANSFER = 0;
+    /** Where the local state stores live, one subdirectory per application.id. */
+    private static final String STATE_DIR = System.getProperty("user.home") + "/kafka-streams";
 
     /** TODO 1: the processing guarantee. */
     private static Properties streamsConfig() {
@@ -49,7 +51,7 @@ public final class StreamsApp {
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, APPLICATION_ID);
         props.put(StreamsConfig.CLIENT_ID_CONFIG, hostname());
         props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG, 3);
-        props.put(StreamsConfig.STATE_DIR_CONFIG, "build/kafka-streams-state");
+        props.put(StreamsConfig.STATE_DIR_CONFIG, STATE_DIR);
 
         // TODO 1: a debit without its credit must never become visible.
         // One setting.

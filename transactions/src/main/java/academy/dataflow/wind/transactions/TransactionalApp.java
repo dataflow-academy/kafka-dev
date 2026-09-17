@@ -14,6 +14,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -84,6 +85,8 @@ public final class TransactionalApp {
     }
 
     private static volatile boolean running = true;
+    /** Counts down once the loop has ended, however it ended. */
+    private static final CountDownLatch stopped = new CountDownLatch(1);
 
     public static void main(String[] args) {
         Properties producerConfig = producerConfig();
@@ -96,13 +99,18 @@ public final class TransactionalApp {
             log.error("The consumer still commits on its own - TODO 2 is still open. See the lab text.");
             System.exit(1);
         }
+        if (!"read_committed".equals(Objects.toString(consumerConfig.get(ConsumerConfig.ISOLATION_LEVEL_CONFIG)))) {
+            log.error("The consumer would also read transfers from aborted transactions - TODO 2 is still open. "
+                    + "See the lab text.");
+            System.exit(1);
+        }
 
         Consumer<String, BankTransfer> consumer = new KafkaConsumer<>(consumerConfig);
         Producer<String, Booking> producer = new KafkaProducer<>(producerConfig);
         Thread main = Thread.currentThread();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (!running) {
-                return; // the app is exiting on its own
+            if (!running || stopped.getCount() == 0) {
+                return; // the app is exiting on its own, e.g. after an error
             }
             log.info("Shutdown signal received, stopping ...");
             running = false;
@@ -115,7 +123,8 @@ public final class TransactionalApp {
         }, "shutdown-hook"));
 
         BookingSupport.Progress progress = new BookingSupport.Progress();
-        try (consumer; producer) {
+        boolean failed = false;
+        try (consumer) {
             // TODO 3: once, before the first transaction: register the
             // transactional id with the broker.
 
@@ -154,9 +163,22 @@ public final class TransactionalApp {
             }
         } catch (WakeupException e) {
             // shutdown
-        } catch (KafkaException e) {
-            // Also the place where the open TODOs 3 and 4 end up.
+        } catch (KafkaException | IllegalStateException e) {
+            // Open TODOs 3 and 4a end up here too: the producer refuses to
+            // send without initTransactions() and beginTransaction().
             log.error("Stopped by the Kafka client: {}", e.toString());
+            failed = true;
+        } finally {
+            if (failed) {
+                // The producer may hold records it can never send (e.g. one
+                // outside a transaction); close() would wait for them forever.
+                producer.close(Duration.ZERO);
+            } else {
+                producer.close();
+            }
+            stopped.countDown();
+        }
+        if (failed) {
             running = false;
             System.exit(1);
         }

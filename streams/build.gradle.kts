@@ -16,9 +16,8 @@ repositories {
 }
 
 dependencies {
-    // Kafka Streams brings kafka-clients along: underneath, it is a consumer
-    // and a producer.
     implementation("org.apache.kafka:kafka-streams:4.1.0")
+    implementation("org.apache.kafka:kafka-clients:4.1.0")
     // Confluent's schemaless JSON serializer - a thin Jackson wrapper, no registry.
     implementation("io.confluent:kafka-json-serializer:8.0.0")
     // The @JsonNaming annotation on the records drives the snake_case wire format.

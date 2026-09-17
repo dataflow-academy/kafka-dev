@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -81,6 +82,8 @@ public final class AtLeastOnceApp {
     }
 
     private static volatile boolean running = true;
+    /** Counts down once the loop has ended, however it ended. */
+    private static final CountDownLatch stopped = new CountDownLatch(1);
 
     public static void main(String[] args) throws InterruptedException {
         Properties consumerConfig = consumerConfig();
@@ -93,8 +96,8 @@ public final class AtLeastOnceApp {
         Producer<String, Booking> producer = new KafkaProducer<>(producerConfig());
         Thread main = Thread.currentThread();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (!running) {
-                return; // the app is exiting on its own
+            if (!running || stopped.getCount() == 0) {
+                return; // the app is exiting on its own, e.g. after an error
             }
             log.info("Shutdown signal received, stopping ...");
             running = false;
@@ -149,6 +152,8 @@ public final class AtLeastOnceApp {
             }
         } catch (WakeupException e) {
             // shutdown
+        } finally {
+            stopped.countDown();
         }
         log.info("Stopped after booking {} transfers", progress.total());
     }

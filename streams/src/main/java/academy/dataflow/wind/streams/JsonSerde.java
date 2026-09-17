@@ -7,7 +7,10 @@ import java.util.Map;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 
-/** Serializer plus deserializer for one JSON type, as a Streams Serde. */
+/**
+ * A Serde for JSON records, built from Confluent's schemaless JSON serializer
+ * and deserializer. Confluent ships the two only separately.
+ */
 final class JsonSerde {
 
     static <T> Serde<T> of(Class<T> type) {
