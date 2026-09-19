@@ -115,13 +115,13 @@ public final class ConsumerApp {
             //     for (ConsumerRecord<String, WindTurbineMeasurement> record : records) {
             //         overview.add(record);
             //     }
-            //     overview.pollDone();
+            //     overview.maybeLogSummary();
             // }
             //
             // poll() does more than fetch: it sends heartbeats, takes part in
             // rebalances and commits the offsets of the previous poll every
-            // 5 seconds. overview.pollDone() prints the table every ten
-            // seconds.
+            // 5 seconds. overview.maybeLogSummary() prints the table, at most
+            // every ten seconds.
             //
             // TODO 5 - in the error handling lab: put a try/catch for
             // RecordDeserializationException around poll().

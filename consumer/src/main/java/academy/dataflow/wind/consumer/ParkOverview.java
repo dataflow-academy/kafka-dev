@@ -80,7 +80,7 @@ final class ParkOverview {
     }
 
     /** Call once per poll, after all records of that poll were added. */
-    void pollDone() {
+    void maybeLogSummary() {
         for (int partition : dirty) {
             writeOffset(partition, processed.get(partition));
         }
