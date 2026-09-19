@@ -16,6 +16,7 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -107,28 +108,27 @@ public final class ConsumerApp {
                 log.info("Reading '{}' as group '{}' (bootstrap: {})", TOPIC, GROUP_ID, BOOTSTRAP_SERVERS);
             }
 
-            boolean firstRound = true;
-            while (running && !todoOpen) {
-                try {
-                    // TODO 4: poll with POLL_TIMEOUT and hand every record to
-                    // overview.add(record).
-                    //
-                    // poll() does more than fetch: it sends heartbeats, takes
-                    // part in rebalances and commits the offsets of the
-                    // previous poll every 5 seconds.
+            // TODO 4: read in a loop until `running` becomes false:
+            //
+            // while (running) {
+            //     ConsumerRecords<String, WindTurbineMeasurement> records = consumer.poll(POLL_TIMEOUT);
+            //     for (ConsumerRecord<String, WindTurbineMeasurement> record : records) {
+            //         overview.add(record);
+            //     }
+            //     overview.pollDone();
+            // }
+            //
+            // poll() does more than fetch: it sends heartbeats, takes part in
+            // rebalances and commits the offsets of the previous poll every
+            // 5 seconds. overview.pollDone() prints the table every ten
+            // seconds.
+            //
+            // TODO 5 - in the error handling lab: put a try/catch for
+            // RecordDeserializationException around poll().
 
-                } catch (RecordDeserializationException e) {
-                    // TODO 5 - in the error handling lab: a record that
-                    // cannot be deserialized. Your group's decision goes here.
-                    throw e;
-                }
-                if (firstRound && !hasPolled(consumer)) {
-                    log.error("No poll() yet - TODO 4 is still open. See the lab text.");
-                    todoOpen = true;
-                    break;
-                }
-                firstRound = false;
-                overview.pollDone();
+            if (!todoOpen && !hasPolled(consumer)) {
+                log.error("No poll() yet - TODO 4 is still open. See the lab text.");
+                todoOpen = true;
             }
         } catch (WakeupException e) {
             // Thrown by poll() after consumer.wakeup(): the normal way out.
