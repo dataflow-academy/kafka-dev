@@ -35,8 +35,6 @@ public final class DualWriteApp {
     private static final String DB_USER = "planning";
     private static final String DB_PASSWORD = "planning";
 
-    /** false: database first, then Kafka. true: the other way round. */
-    private static final boolean KAFKA_FIRST = false;
     /**
      * Time between the two writes - in a real service this is where the
      * mapping, a call to another system or just a GC pause happens.
@@ -53,26 +51,21 @@ public final class DualWriteApp {
 
         try (Connection db = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
              Producer<String, MaintenanceOrder> producer = new KafkaProducer<>(producerConfig())) {
-            log.info("Writing orders to table maintenance_order and topic '{}', {} first",
-                    TOPIC, KAFKA_FIRST ? "Kafka" : "database");
+            log.info("Writing orders to table maintenance_order and topic '{}'", TOPIC);
 
             long orders = 0;
             while (running) {
                 MaintenanceOrder order = planner.next();
                 String name = "order %s (%s)".formatted(order.orderId().substring(0, 8), order.windTurbineId());
-                if (KAFKA_FIRST) {
-                    send(producer, order);
-                    log.info("{}: Kafka ✓", name);
-                    Thread.sleep(WORK_BETWEEN_WRITES_MS);
-                    insert(db, order);
-                    log.info("{}: database ✓", name);
-                } else {
-                    insert(db, order);
-                    log.info("{}: database ✓", name);
-                    Thread.sleep(WORK_BETWEEN_WRITES_MS);
-                    send(producer, order);
-                    log.info("{}: Kafka ✓", name);
-                }
+
+                insert(db, order);
+                log.info("{}: database ✓", name);
+
+                Thread.sleep(WORK_BETWEEN_WRITES_MS);
+
+                send(producer, order);
+                log.info("{}: Kafka ✓", name);
+
                 orders++;
                 Thread.sleep(PAUSE_BETWEEN_ORDERS_MS);
             }

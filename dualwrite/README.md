@@ -17,7 +17,8 @@ psql -f maintenance-order.sql
 ```
 
 Expects Postgres on `localhost:5432` (database `user`) and a Kafka cluster on
-`localhost:9092,9093,9094`. Topic, connection and the order of the two writes
-are constants at the top of `DualWriteApp`.
+`localhost:9092,9093,9094`. Topic and connection are constants at the top of
+`DualWriteApp`, the order of the two writes is the order of the statements in
+`main`.
 
 Java 25 or newer.

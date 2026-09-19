@@ -1,16 +1,19 @@
 {
-  "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
-  "database.hostname": "localhost",
-  "database.port": "5432",
-  "database.user": "debezium",
-  "database.password": "debezium",
-  "database.dbname": "user",
-  "plugin.name": "pgoutput",
-  "slot.name": "turbine_registry_cdc",
-  "publication.name": "turbine_registry_cdc",
-  "publication.autocreate.mode": "filtered",
-  "table.include.list": "public.turbine_registry",
-  "topic.prefix": "nordwind.assets.private.cdc",
-  "topic.creation.default.partitions": "3",
-  "topic.creation.default.replication.factor": "3"
+  "name": "turbine-registry-cdc",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "database.hostname": "localhost",
+    "database.port": "5432",
+    "database.user": "debezium",
+    "database.password": "debezium",
+    "database.dbname": "user",
+    "plugin.name": "pgoutput",
+    "slot.name": "turbine_registry_cdc",
+    "publication.name": "turbine_registry_cdc",
+    "publication.autocreate.mode": "filtered",
+    "table.include.list": "public.turbine_registry",
+    "topic.prefix": "nordwind.assets.private.cdc",
+    "topic.creation.default.partitions": "3",
+    "topic.creation.default.replication.factor": "3"
+  }
 }

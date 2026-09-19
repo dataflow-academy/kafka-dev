@@ -1,18 +1,21 @@
 {
-  "connector.class": "io.confluent.connect.jdbc.JdbcSourceConnector",
-  "connection.url": "jdbc:postgresql://localhost:5432/user",
-  "connection.user": "jdbc_reader",
-  "connection.password": "jdbc_reader",
-  "table.whitelist": "turbine_registry",
-  "mode": "incrementing",
-  "incrementing.column.name": "id",
-  "poll.interval.ms": "2000",
-  "topic.prefix": "nordwind.assets.private.jdbc.",
-  "topic.creation.default.partitions": "3",
-  "topic.creation.default.replication.factor": "3",
-  "transforms": "idAsKey,unwrapKey",
-  "transforms.idAsKey.type": "org.apache.kafka.connect.transforms.ValueToKey",
-  "transforms.idAsKey.fields": "wind_turbine_id",
-  "transforms.unwrapKey.type": "org.apache.kafka.connect.transforms.ExtractField$Key",
-  "transforms.unwrapKey.field": "wind_turbine_id"
+  "name": "turbine-registry-jdbc",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSourceConnector",
+    "connection.url": "jdbc:postgresql://localhost:5432/user",
+    "connection.user": "jdbc_reader",
+    "connection.password": "jdbc_reader",
+    "table.whitelist": "turbine_registry",
+    "mode": "incrementing",
+    "incrementing.column.name": "id",
+    "poll.interval.ms": "2000",
+    "topic.prefix": "nordwind.assets.private.jdbc.",
+    "topic.creation.default.partitions": "3",
+    "topic.creation.default.replication.factor": "3",
+    "transforms": "idAsKey,unwrapKey",
+    "transforms.idAsKey.type": "org.apache.kafka.connect.transforms.ValueToKey",
+    "transforms.idAsKey.fields": "wind_turbine_id",
+    "transforms.unwrapKey.type": "org.apache.kafka.connect.transforms.ExtractField$Key",
+    "transforms.unwrapKey.field": "wind_turbine_id"
+  }
 }
