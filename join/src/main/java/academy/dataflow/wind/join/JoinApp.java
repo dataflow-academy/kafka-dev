@@ -12,7 +12,6 @@ import org.apache.kafka.streams.AutoOffsetReset;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.TopologyDescription;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
@@ -42,7 +41,7 @@ public final class JoinApp {
     /** Where the local state stores live, one subdirectory per application.id. */
     private static final String STATE_DIR = System.getProperty("user.home") + "/kafka-streams";
 
-    /** Counted by enrich(), logged every ten seconds. */
+    /** Counted while the records flow through, logged every ten seconds. */
     private static final AtomicLong measurementsIn = new AtomicLong();
     private static final AtomicLong joined = new AtomicLong();
     private static final AtomicLong withoutMasterData = new AtomicLong();
@@ -69,40 +68,35 @@ public final class JoinApp {
         // TODO 1: read REGISTRY_TOPIC as a table.
         KTable<String, WindTurbineRegistration> registry = null;
 
-        // TODO 2: join the telemetry with the registry, using enrich() below
-        // as the joiner, and write the result to OUTPUT_TOPIC. join() or
-        // leftJoin() - that is your decision from the lab text.
+        // TODO 2: join the telemetry with the registry. The joiner is a lambda
+        // (measurement, registration) -> ...; EnrichedMeasurement.of() copies
+        // both sides into the output record. join() or leftJoin() - that is
+        // your decision from the lab text.
         KStream<String, EnrichedMeasurement> enriched = null;
 
-        if (registry == null || enriched == null) {
-            log.error("No join yet - TODO {} is still open. See the lab text.", registry == null ? 1 : 2);
+        // TODO 3: fill in the capacity factor with mapValues(). Power divided
+        // by rated power, rounded to three decimals; withCapacityFactor()
+        // returns the record with it. Without master data there is nothing to
+        // divide by.
+        KStream<String, EnrichedMeasurement> withCapacityFactor = null;
+
+        if (registry == null || enriched == null || withCapacityFactor == null) {
+            int todo = registry == null ? 1 : enriched == null ? 2 : 3;
+            log.error("No join yet - TODO {} is still open. See the lab text.", todo);
             System.exit(1);
         }
-        return builder.build();
-    }
 
-    /**
-     * The joiner: called once per measurement that the join lets through. In
-     * a left join, the registration is null when no master data was found.
-     */
-    private static EnrichedMeasurement enrich(WindTurbineMeasurement measurement,
-                                              WindTurbineRegistration registration) {
-        (registration == null ? withoutMasterData : joined).incrementAndGet();
-        return EnrichedMeasurement.of(measurement, registration);
+        withCapacityFactor
+                .peek((turbineId, measurement) ->
+                        (measurement.ratedPowerKw() == null ? withoutMasterData : joined).incrementAndGet())
+                .to(OUTPUT_TOPIC, Produced.with(stringSerde, enrichedSerde));
+
+        return builder.build();
     }
 
     public static void main(String[] args) {
         Topology topology = buildTopology();
-        if (!writesToATopic(topology)) {
-            log.error("The topology writes nowhere - TODO 2 is still open. See the lab text.");
-            System.exit(1);
-        }
-        String todo3 = EnrichedMeasurement.selfCheck();
-        if (todo3 != null) {
-            log.error("{}. See the lab text.", todo3);
-            System.exit(1);
-        }
-        log.info("Topology:\n{}", topology.describe());
+        StreamsSupport.publishTopology(topology);
 
         Map<String, Integer> partitions =
                 StreamsSupport.requireTopics(BOOTSTRAP_SERVERS, TELEMETRY_TOPIC, REGISTRY_TOPIC, OUTPUT_TOPIC);
@@ -121,12 +115,6 @@ public final class JoinApp {
                 10, 10, TimeUnit.SECONDS);
 
         StreamsSupport.runUntilShutdown(new KafkaStreams(topology, streamsConfig()));
-    }
-
-    private static boolean writesToATopic(Topology topology) {
-        return topology.describe().subtopologies().stream()
-                .flatMap(subtopology -> subtopology.nodes().stream())
-                .anyMatch(node -> node instanceof TopologyDescription.Sink);
     }
 
     private JoinApp() {

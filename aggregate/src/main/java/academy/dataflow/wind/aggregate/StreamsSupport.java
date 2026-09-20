@@ -1,7 +1,10 @@
 package academy.dataflow.wind.aggregate;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +20,7 @@ import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.ThreadMetadata;
+import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.errors.LogAndContinueExceptionHandler;
 import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
 import org.slf4j.Logger;
@@ -130,6 +134,22 @@ final class StreamsSupport {
             System.exit(1);
         }
         log.info("Stopped cleanly");
+    }
+
+    /**
+     * Writes the topology to topology.txt in the working directory, so it can
+     * be opened and pasted into a visualizer. Also logs it.
+     */
+    static void publishTopology(Topology topology) {
+        String description = topology.describe().toString();
+        log.info("Topology:\n{}", description);
+        Path file = Path.of(System.getProperty("user.dir"), "topology.txt").toAbsolutePath();
+        try {
+            Files.writeString(file, description);
+            log.info("Topology written to {}", file);
+        } catch (IOException e) {
+            log.warn("Could not write {}: {}", file, e.toString());
+        }
     }
 
     /** Which tasks - and therefore which partitions - this instance works on. */

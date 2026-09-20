@@ -26,31 +26,22 @@ public record EnrichedMeasurement(
         Double ratedPowerKw,
         Double capacityFactor) {
 
-    /** Joins one measurement with its registration, which may be null. */
+    /**
+     * The measurement plus whatever master data the join found; the capacity
+     * factor is still open. In a left join the registration is null.
+     */
     static EnrichedMeasurement of(WindTurbineMeasurement m, WindTurbineRegistration r) {
-        if (r == null) {
-            return new EnrichedMeasurement(m.windTurbineId(), m.windParkId(), m.timestamp(),
-                    m.windSpeedMs(), m.powerKw(), m.status(), null, null, null, null);
-        }
-        // TODO 3: compute the capacity factor, rounded to three decimals.
-        Double capacityFactor = null;
         return new EnrichedMeasurement(m.windTurbineId(), m.windParkId(), m.timestamp(),
                 m.windSpeedMs(), m.powerKw(), m.status(),
-                r.manufacturer(), r.model(), r.ratedPowerKw(), capacityFactor);
+                r == null ? null : r.manufacturer(),
+                r == null ? null : r.model(),
+                r == null ? null : r.ratedPowerKw(),
+                null);
     }
 
-    /** Feeds one known measurement through of() and compares. */
-    static String selfCheck() {
-        WindTurbineMeasurement m = new WindTurbineMeasurement(
-                "nordsee-ost-01", "nordsee-ost", 0, 9.0, 1234.5, TurbineStatus.PRODUCING);
-        WindTurbineRegistration r = new WindTurbineRegistration(
-                "nordsee-ost-01", "nordsee-ost", "Senvion", "6.2M126", 6200.0, "2015-05-01");
-        Double capacityFactor = of(m, r).capacityFactor();
-        if (capacityFactor == null) {
-            return "TODO 3 is still open";
-        }
-        return capacityFactor == 0.199 ? null
-                : "The capacity factor is not right yet: 1234.5 kW of 6200 kW should give 0.199, but gave "
-                        + capacityFactor;
+    /** A copy with the capacity factor filled in. */
+    EnrichedMeasurement withCapacityFactor(double capacityFactor) {
+        return new EnrichedMeasurement(windTurbineId, windParkId, timestamp, windSpeedMs, powerKw,
+                status, manufacturer, model, ratedPowerKw, capacityFactor);
     }
 }

@@ -89,7 +89,7 @@ public final class AggregateApp {
             log.error("The topology writes nowhere - TODO 3 is still open. See the lab text.");
             System.exit(1);
         }
-        log.info("Topology:\n{}", topology.describe());
+        StreamsSupport.publishTopology(topology);
 
         StreamsSupport.requireTopics(BOOTSTRAP_SERVERS, INPUT_TOPIC, OUTPUT_TOPIC);
         log.info("Averaging '{}' -> '{}' (application.id: {})", INPUT_TOPIC, OUTPUT_TOPIC, APPLICATION_ID);

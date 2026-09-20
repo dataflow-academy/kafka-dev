@@ -38,10 +38,3 @@ application {
     applicationDefaultJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
     mainClass = "academy.dataflow.wind.join.JoinApp"
 }
-
-// The master data source: ./gradlew publishRegistry
-tasks.register<JavaExec>("publishRegistry") {
-    group = "application"
-    classpath = sourceSets["main"].runtimeClasspath
-    mainClass = "academy.dataflow.wind.join.RegistryPublisher"
-}

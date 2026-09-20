@@ -24,6 +24,6 @@ Expects a Kafka cluster on `localhost:9092,9093,9094`, the input topic
 `nordwind.scada.public.turbine-telemetry.event` and the output topic
 `nordwind.scada.public.turbine-power-average.state`. Topics, application id
 and commit interval are constants at the top of `AggregateApp`. Local state
-lives in `~/kafka-streams`.
+lives in `~/kafka-streams`, the topology is written to `topology.txt`.
 
 Java 25 or newer.
