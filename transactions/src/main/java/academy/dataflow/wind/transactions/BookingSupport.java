@@ -13,9 +13,6 @@ final class BookingSupport {
     private static final Logger log = LoggerFactory.getLogger(BookingSupport.class);
 
     static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
-    static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer.event";
-    static final String DEBITS_TOPIC = "nordbank.payments.public.debit.event";
-    static final String CREDITS_TOPIC = "nordbank.payments.public.credit.event";
 
     private static final AtomicLong started = new AtomicLong();
 

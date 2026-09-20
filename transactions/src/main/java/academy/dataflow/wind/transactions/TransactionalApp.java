@@ -1,9 +1,6 @@
 package academy.dataflow.wind.transactions;
 
 import static academy.dataflow.wind.transactions.BookingSupport.BOOTSTRAP_SERVERS;
-import static academy.dataflow.wind.transactions.BookingSupport.CREDITS_TOPIC;
-import static academy.dataflow.wind.transactions.BookingSupport.DEBITS_TOPIC;
-import static academy.dataflow.wind.transactions.BookingSupport.TRANSFERS_TOPIC;
 import static academy.dataflow.wind.transactions.BookingSupport.haltIfDue;
 import static academy.dataflow.wind.transactions.BookingSupport.hostname;
 
@@ -45,6 +42,11 @@ public final class TransactionalApp {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionalApp.class);
 
+    /** This lab has its own topics, so the last lab's result stays readable. */
+    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer-transactions.event";
+    private static final String DEBITS_TOPIC = "nordbank.payments.public.debit-transactions.event";
+    private static final String CREDITS_TOPIC = "nordbank.payments.public.credit-transactions.event";
+
     private static final String GROUP_ID = "nordbank-booking-transactional";
     /**
      * The process dies while it books this transfer (counted from the start
@@ -61,6 +63,11 @@ public final class TransactionalApp {
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaJsonSerializer.class);
+        // One transaction per transfer means the next one starts while the
+        // markers of the previous one are still being written. The broker
+        // answers CONCURRENT_TRANSACTIONS, and the client waits this long
+        // before trying again. The default of 100 ms dominates the runtime.
+        props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 10);
 
         // TODO 1: the transactional id. Which value? It decides what happens
         // to a half-finished transaction when the app restarts.

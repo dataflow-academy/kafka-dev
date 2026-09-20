@@ -21,16 +21,4 @@ public record Booking(
         String counterAccount,
         long amountCents,
         long timestamp) {
-
-    /** The debit on the paying account. Key it by {@link #account()}. */
-    public static Booking debit(BankTransfer transfer) {
-        return new Booking(transfer.transferId(), transfer.fromAccount(), transfer.toAccount(),
-                transfer.amountCents(), transfer.timestamp());
-    }
-
-    /** The credit on the receiving account. Key it by {@link #account()}. */
-    public static Booking credit(BankTransfer transfer) {
-        return new Booking(transfer.transferId(), transfer.toAccount(), transfer.fromAccount(),
-                transfer.amountCents(), transfer.timestamp());
-    }
 }

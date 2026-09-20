@@ -5,9 +5,10 @@ a credit on the receiving one. First by hand with at-least-once, then with a
 Kafka transaction around both bookings and the consumer offset.
 
 - [`TransferSource.java`](src/main/java/academy/dataflow/wind/transactions/TransferSource.java)
-  writes 1000 transfers per run. Nothing to fill in.
+  writes 1000 transfers per run, into the transfer topic of every lab that
+  exists. Nothing to fill in.
 - [`AtLeastOnceApp.java`](src/main/java/academy/dataflow/wind/transactions/AtLeastOnceApp.java)
-  has three TODOs: the consumer config, the two bookings, the offset commit.
+  has one TODO: the two bookings. The consumer commits the offsets itself.
 - [`TransactionalApp.java`](src/main/java/academy/dataflow/wind/transactions/TransactionalApp.java)
   has the bookings already; its four TODOs are the transaction around them.
 
@@ -25,8 +26,8 @@ solutions.
 ./gradlew runTransactional
 ```
 
-Expects a Kafka cluster on `localhost:9092,9093,9094` and the topics
-`nordbank.payments.public.transfer.event`, `nordbank.payments.public.debit.event`
-and `nordbank.payments.public.credit.event`.
+Expects a Kafka cluster on `localhost:9092,9093,9094`. Every lab has its own
+topics: `nordbank.payments.public.<entity>-at-least-once.event` and
+`…-transactions.event`, with `<entity>` being `transfer`, `debit` or `credit`.
 
 Java 25 or newer.

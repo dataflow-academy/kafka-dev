@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KafkaStreams;
@@ -31,9 +32,10 @@ public final class StreamsApp {
     private static final Logger log = LoggerFactory.getLogger(StreamsApp.class);
 
     private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
-    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer.event";
-    private static final String DEBITS_TOPIC = "nordbank.payments.public.debit.event";
-    private static final String CREDITS_TOPIC = "nordbank.payments.public.credit.event";
+    /** This lab has its own topics, so the last lab's result stays readable. */
+    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer-streams.event";
+    private static final String DEBITS_TOPIC = "nordbank.payments.public.debit-streams.event";
+    private static final String CREDITS_TOPIC = "nordbank.payments.public.credit-streams.event";
     /** Also the consumer group and the transactional id prefix. */
     private static final String APPLICATION_ID = "nordbank-booking-streams";
     /**
@@ -52,6 +54,9 @@ public final class StreamsApp {
         props.put(StreamsConfig.CLIENT_ID_CONFIG, hostname());
         props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG, 3);
         props.put(StreamsConfig.STATE_DIR_CONFIG, STATE_DIR);
+        // Costs nothing and saves a surprise: without it a consumer reads
+        // records from aborted transactions too.
+        props.put(StreamsConfig.consumerPrefix(ConsumerConfig.ISOLATION_LEVEL_CONFIG), "read_committed");
 
         // TODO 1: a debit without its credit must never become visible.
         // One setting.
@@ -60,18 +65,19 @@ public final class StreamsApp {
     }
 
     private static Topology buildTopology(Properties config) {
-        Serde<String> keys = Serdes.String();
-        Serde<Booking> bookings = JsonSerde.of(Booking.class);
+        Serde<String> keySerde = Serdes.String();
+        Serde<Booking> bookingSerde = JsonSerde.of(Booking.class);
 
         StreamsBuilder builder = new StreamsBuilder();
         KStream<String, BankTransfer> transfers = builder
-                .stream(TRANSFERS_TOPIC, Consumed.with(keys, JsonSerde.of(BankTransfer.class)))
+                .stream(TRANSFERS_TOPIC, Consumed.with(keySerde, JsonSerde.of(BankTransfer.class)))
                 // The process dies here at HALT_AT_TRANSFER.
                 .peek(StreamsApp::countAndHaltIfDue);
 
-        // TODO 2: the debits. The transfer's key already is the paying
-        // account. Booking.debit() builds the value; write it to DEBITS_TOPIC
-        // with Produced.with(keys, bookings).
+        // TODO 2: the debits. Build a Booking for the paying account out of
+        // every transfer and write it to DEBITS_TOPIC with
+        // Produced.with(keySerde, bookingSerde). The transfer's key already is
+        // the paying account.
 
         // TODO 3: the credits, keyed by the receiving account.
 
@@ -106,7 +112,10 @@ public final class StreamsApp {
             log.warn("HALT while processing transfer #{} of this run ({}). "
                     + "Set HALT_AT_TRANSFER back to 0 before the next start.", n, transfer.transferId());
             try {
-                // Give the producer a moment to send what it has buffered.
+                // The crash has to hit an empty producer buffer, not a half
+                // full one: wait longer than linger.ms (100 ms in Streams) so
+                // that every booking made so far has really reached the
+                // broker. Without it the counts afterwards are pure chance.
                 Thread.sleep(1000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -134,7 +143,9 @@ public final class StreamsApp {
             }
         });
         CountDownLatch shutdownRequested = new CountDownLatch(1);
-        Thread main = Thread.currentThread();
+        // Ctrl+C and Stop end up here. The hook does the whole shutdown and
+        // never waits for the main thread: during shutdown the JVM does not
+        // schedule it any more, so joining it would just burn the timeout.
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (stopped.getCount() == 0) {
                 return; // Streams has already stopped on its own
@@ -142,11 +153,8 @@ public final class StreamsApp {
             log.info("Shutdown signal received, closing Kafka Streams ...");
             shutdownRequested.countDown();
             streams.close(Duration.ofSeconds(30));
-            try {
-                main.join(5000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            log.info("Stopped after processing {} transfers", processed.get());
+            stopped.countDown();
         }, "shutdown-hook"));
 
         streams.start();
@@ -159,7 +167,6 @@ public final class StreamsApp {
             log.error("Kafka Streams stopped on its own (state: {})", streams.state());
             System.exit(1);
         }
-        log.info("Stopped after processing {} transfers", processed.get());
     }
 
     private static String hostname() {
