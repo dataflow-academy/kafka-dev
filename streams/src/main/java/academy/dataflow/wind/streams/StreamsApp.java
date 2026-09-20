@@ -1,7 +1,10 @@
 package academy.dataflow.wind.streams;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
@@ -92,7 +95,7 @@ public final class StreamsApp {
         }
         Topology topology = buildTopology(config);
         String description = topology.describe().toString();
-        log.info("Topology:\n{}", description);
+        publishTopology(description);
         if (!description.contains(DEBITS_TOPIC) || !description.contains(CREDITS_TOPIC)) {
             log.error("The topology does not write to both booking topics yet - TODO 2 and 3. See the lab text.");
             System.exit(1);
@@ -101,6 +104,21 @@ public final class StreamsApp {
                 config.get(StreamsConfig.PROCESSING_GUARANTEE_CONFIG),
                 HALT_AT_TRANSFER == 0 ? "never" : HALT_AT_TRANSFER);
         runUntilShutdown(new KafkaStreams(topology, config));
+    }
+
+    /**
+     * Writes the topology to topology.txt in the working directory, so it can
+     * be opened and pasted into a visualizer. Also logs it.
+     */
+    private static void publishTopology(String description) {
+        log.info("Topology:\n{}", description);
+        Path file = Path.of(System.getProperty("user.dir"), "topology.txt").toAbsolutePath();
+        try {
+            Files.writeString(file, description);
+            log.info("Topology written to {}", file);
+        } catch (IOException e) {
+            log.warn("Could not write {}: {}", file, e.toString());
+        }
     }
 
     private static final AtomicLong processed = new AtomicLong();
