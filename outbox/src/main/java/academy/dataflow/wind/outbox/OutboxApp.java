@@ -6,7 +6,9 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -18,9 +20,9 @@ import org.slf4j.LoggerFactory;
  * to the table maintenance_order, and the event for it to the outbox table.
  * Debezium takes it from there. This service does not know Kafka.
  *
- * <p>Two things are yours: the INSERT into your outbox table (TODO 2) and,
- * later in the lab, the transaction around both writes (TODO 3). TODO 1 is
- * the outbox table itself, in outbox.sql.
+ * <p>Two things are yours: the INSERT into the outbox table (TODO 1) and,
+ * later in the lab, the transaction around both writes (TODO 2). The tables
+ * themselves come from outbox.sql.
  */
 public final class OutboxApp {
 
@@ -33,6 +35,8 @@ public final class OutboxApp {
 
     /** Decides the target topic: the Event Router routes by this column. */
     private static final String AGGREGATE_TYPE = "maintenance-order";
+
+    /** The kind of event. One of the optional tasks puts it into a header. */
     private static final String EVENT_TYPE = "MaintenanceOrderScheduled";
 
     /** Time between the two writes, as in the dual write lab. */
@@ -46,7 +50,7 @@ public final class OutboxApp {
         MaintenancePlanner planner = new MaintenancePlanner();
 
         try (Connection db = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD)) {
-            // TODO 3 (later in the lab): what has to change so that an order
+            // TODO 2 (later in the lab): what has to change so that an order
             // and its event are committed together - or not at all?
 
             if (!outboxInsertWorks(db, planner.next())) {
@@ -66,7 +70,7 @@ public final class OutboxApp {
                 Thread.sleep(WORK_BETWEEN_WRITES_MS);
                 insertEvent(db, order);
                 log.info("{}: event written", name);
-                // TODO 3, continued
+                // TODO 2, continued
 
                 orders++;
                 Thread.sleep(PAUSE_BETWEEN_ORDERS_MS);
@@ -91,10 +95,9 @@ public final class OutboxApp {
     /**
      * Writes the event for one order into the outbox table.
      *
-     * <p>TODO 2: insert one row into the outbox table you created. The
-     * Event Router needs to know which topic the event goes to
-     * (AGGREGATE_TYPE), which key it gets, what kind of event it is
-     * (EVENT_TYPE) and the payload. Which value belongs in the key?
+     * <p>TODO 1: insert one row into the outbox table. The Event Router
+     * needs to know which topic the event goes to (AGGREGATE_TYPE), which
+     * key it gets and the payload. Which value belongs in the key?
      */
     private static void insertEvent(Connection db, MaintenanceOrder order)
             throws SQLException, JsonProcessingException {
@@ -105,26 +108,38 @@ public final class OutboxApp {
         //     ...
         //     stmt.executeUpdate();
         // }
-
-        throw new IllegalStateException("TODO 2 is still open - see the lab text.");
     }
 
     /**
-     * Tries TODO 2 once and rolls it back, so a missing or broken outbox
+     * Tries TODO 1 once and rolls it back, so a missing or broken outbox
      * insert stops the app before it writes a single order.
      */
     private static boolean outboxInsertWorks(Connection db, MaintenanceOrder probe) throws SQLException {
         boolean autoCommit = db.getAutoCommit();
         db.setAutoCommit(false);
         try {
+            long before = countOutbox(db);
             insertEvent(db, probe);
+            if (countOutbox(db) == before) {
+                log.error("TODO 1 is still open - see the lab text.");
+                return false;
+            }
             return true;
-        } catch (IllegalStateException | SQLException | JsonProcessingException e) {
+        } catch (SQLException | JsonProcessingException e) {
             log.error("Cannot write to the outbox: {}", e.getMessage());
             return false;
         } finally {
             db.rollback();
             db.setAutoCommit(autoCommit);
+        }
+    }
+
+    /** Counts the rows the current transaction sees in the outbox. */
+    private static long countOutbox(Connection db) throws SQLException {
+        try (Statement stmt = db.createStatement();
+                ResultSet rs = stmt.executeQuery("SELECT count(*) FROM outbox")) {
+            rs.next();
+            return rs.getLong(1);
         }
     }
 

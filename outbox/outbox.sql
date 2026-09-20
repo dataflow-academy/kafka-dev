@@ -15,12 +15,14 @@ CREATE TABLE maintenance_order (
     created_at      timestamptz NOT NULL DEFAULT now()
 );
 
--- TODO 1: create the table outbox. By default, the Debezium Event Router
--- reads the columns id, aggregatetype, aggregateid, type and payload.
-
-
-
--- Everything below is ready.
+-- The outbox. By default, the Debezium Event Router reads the columns id,
+-- aggregatetype, aggregateid and payload.
+CREATE TABLE outbox (
+    id            uuid PRIMARY KEY,
+    aggregatetype text NOT NULL,
+    aggregateid   text NOT NULL,
+    payload       jsonb NOT NULL
+);
 
 DO $$
 BEGIN
