@@ -83,8 +83,7 @@ public final class ProducerApp {
         ProducerSupport.onShutdown(() -> running = false);
 
         try {
-            log.info("Producing to '{}' every {} ms (bootstrap: {})",
-                    TOPIC, TICK_INTERVAL_MS, BOOTSTRAP_SERVERS);
+            ProducerSupport.logStart(TOPIC, TICK_INTERVAL_MS, BOOTSTRAP_SERVERS); // Lab helper: one start line.
 
             while (running && !ProducerSupport.gaveUp()) {
                 long tickStart = System.currentTimeMillis();

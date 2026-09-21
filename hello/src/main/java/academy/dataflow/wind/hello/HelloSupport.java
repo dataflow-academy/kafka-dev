@@ -4,8 +4,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 /**
- * Lab scaffolding, not part of the exercise. It keeps the lab observable and
- * safe to break; a production client would not need any of it.
+ * Lab scaffolding — not part of the exercise. It keeps the lab observable and
+ * safe to break; you would not write this in a production client.
  */
 final class HelloSupport {
 

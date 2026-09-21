@@ -12,8 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Lab scaffolding, not part of the exercise. It keeps the lab observable and
- * safe to break; a production client would not need any of it.
+ * Lab scaffolding — not part of the exercise. It keeps the lab observable and
+ * safe to break; you would not write this in a production client.
  */
 final class ConsumerSupport {
 
@@ -31,14 +31,14 @@ final class ConsumerSupport {
         }
     }
 
-    /** True once TODO 3 has subscribed; otherwise logs a hint and remembers it for exit. */
-    static boolean subscribed(Consumer<?, ?> consumer) {
+    /** Logs the start line once TODO 3 has subscribed, otherwise a hint for the exit code. */
+    static void checkSubscribed(Consumer<?, ?> consumer, String topic, String groupId, String bootstrapServers) {
         if (consumer.subscription().isEmpty()) {
             log.error("Not subscribed yet - TODO 3 is still open. See the lab text.");
             todoOpen = true;
-            return false;
+        } else {
+            log.info("Reading '{}' as group '{}' (bootstrap: {})", topic, groupId, bootstrapServers);
         }
-        return true;
     }
 
     /** Logs a hint when TODO 4 never called poll(), so the run does not look like a success. */

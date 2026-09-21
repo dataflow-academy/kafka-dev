@@ -14,8 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Lab scaffolding, not part of the exercise. It keeps the lab observable and
- * safe to break; a production client would not need any of it.
+ * Lab scaffolding — not part of the exercise. It keeps the lab observable and
+ * safe to break; you would not write this in a production client.
  */
 final class ProducerSupport {
 
@@ -63,6 +63,11 @@ final class ProducerSupport {
     /** True once giveUp() has been called. */
     static boolean gaveUp() {
         return fatalError.get();
+    }
+
+    /** Logs where the producer writes to and how often. */
+    static void logStart(String topic, long tickIntervalMs, String bootstrapServers) {
+        log.info("Producing to '{}' every {} ms (bootstrap: {})", topic, tickIntervalMs, bootstrapServers);
     }
 
     /** Starts the clock for the reports and measures how large a record value is. */
