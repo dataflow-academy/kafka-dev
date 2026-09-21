@@ -25,32 +25,22 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Books transfers by hand: reads each transfer, writes a debit and a credit.
  * The consumer commits the offsets in the background, so a crash between the
  * two bookings replays everything since the last automatic commit.
  *
- * <p>Everything outside the TODO is scaffolding and already works. Calls
- * into BookingSupport are lab helpers you can skip while reading.
+ * <p>Calls into BookingSupport are lab helpers you can skip while reading.
  */
 public final class AtLeastOnceApp {
 
-    private static final Logger log = LoggerFactory.getLogger(AtLeastOnceApp.class);
-
     /** All three bank labs read from this one topic; TransferSource fills it. */
     private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer.event";
-    /** The bookings stay per lab, so this lab's result stays readable afterwards. */
     private static final String DEBITS_TOPIC = "nordbank.payments.public.debit-at-least-once.event";
     private static final String CREDITS_TOPIC = "nordbank.payments.public.credit-at-least-once.event";
-
     private static final String GROUP_ID = "nordbank-booking-at-least-once";
-    /**
-     * The process dies while it books this transfer (counted from the start
-     * of this run), between the first and the second booking. 0 = never.
-     */
+    /** The process dies while it books this transfer of the run, between the two bookings. 0 = never. */
     private static final long HALT_AT_TRANSFER = 0;
 
     private static Properties consumerConfig() {
@@ -63,13 +53,9 @@ public final class AtLeastOnceApp {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, KafkaJsonDeserializer.class);
         props.put(KafkaJsonDeserializerConfig.JSON_VALUE_TYPE, BankTransfer.class.getName());
-        // Costs nothing and saves a surprise as soon as somebody upstream
-        // writes transactionally. The default is read_uncommitted.
+        // Saves a surprise once somebody upstream writes transactionally.
         props.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, "read_committed");
-        // enable.auto.commit stays on its default: the consumer commits the
-        // offsets of the last poll in the background, every
-        // auto.commit.interval.ms.
-
+        // enable.auto.commit stays on: offsets are committed in the background.
         return props;
     }
 
@@ -89,34 +75,22 @@ public final class AtLeastOnceApp {
     public static void main(String[] args) {
         Consumer<String, BankTransfer> consumer = new KafkaConsumer<>(consumerConfig());
         Producer<String, Booking> producer = new KafkaProducer<>(producerConfig());
-        // Ctrl+C or Stop: end the loop, then let main() close the clients.
-        Thread main = Thread.currentThread();
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (!running) {
-                return; // the app is exiting on its own, e.g. after an error
-            }
-            log.info("Shutdown signal received, stopping ...");
+        // Ctrl+C or Stop: end the loop.
+        BookingSupport.onShutdown(() -> {
             running = false;
             consumer.wakeup();
-            BookingSupport.awaitExit(main);
-        }, "shutdown-hook"));
-
+        });
         // Lab helpers: progress lines, and a stop while TODO 1 is still open.
         BookingSupport.Progress progress = new BookingSupport.Progress();
         BookingSupport.OpenTodoGuard guard = new BookingSupport.OpenTodoGuard(consumer, producer, progress);
-        boolean todoOpen = false;
+
         try (consumer; producer) {
             consumer.subscribe(List.of(TRANSFERS_TOPIC));
-            log.info("Booking '{}' -> '{}' and '{}' (group: {}, halt at transfer: {})",
-                    TRANSFERS_TOPIC, DEBITS_TOPIC, CREDITS_TOPIC, GROUP_ID,
-                    HALT_AT_TRANSFER == 0 ? "never" : HALT_AT_TRANSFER);
+            BookingSupport.logStart(TRANSFERS_TOPIC, DEBITS_TOPIC, CREDITS_TOPIC, GROUP_ID, null, HALT_AT_TRANSFER);
 
             while (running) {
                 ConsumerRecords<String, BankTransfer> records = consumer.poll(Duration.ofMillis(500));
-                if (guard.todoStillOpen(records)) {
-                    todoOpen = true;
-                    break;
-                }
+                guard.exitIfTodoOpen(records);
                 for (ConsumerRecord<String, BankTransfer> record : records) {
                     if (!running) {
                         break; // shutdown: the rest of this poll is read again next time
@@ -140,15 +114,9 @@ public final class AtLeastOnceApp {
         } catch (WakeupException e) {
             // shutdown
         } finally {
-            running = false;
+            BookingSupport.closed(); // Lab helper: releases the shutdown hook.
         }
-        if (todoOpen) {
-            // Only now: close() above has left the group, so the next start
-            // does not wait for this consumer's session to time out.
-            System.exit(1);
-        }
-
-        log.info("Stopped after booking {} transfers", progress.total());
+        progress.logStopped();
     }
 
     private AtLeastOnceApp() {

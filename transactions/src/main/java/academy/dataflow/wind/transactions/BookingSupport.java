@@ -8,7 +8,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.CountDownLatch;
+import java.time.Duration;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -35,6 +38,8 @@ final class BookingSupport {
     static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
 
     private static final AtomicLong started = new AtomicLong();
+    /** Counts down once main() is done with the clients, or the app exits on its own. */
+    private static final CountDownLatch stopped = new CountDownLatch(1);
 
     /**
      * Stops the JVM at the configured transfer, between the two bookings, so
@@ -67,29 +72,75 @@ final class BookingSupport {
         }
     }
 
-    /** Waits up to 15 s for the given thread to finish, so it can close its clients. */
-    static void awaitExit(Thread thread) {
-        try {
-            thread.join(15_000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+    /**
+     * Installs a shutdown hook for Ctrl+C and Stop: it logs, runs {@code stop}
+     * and waits until {@link #closed()} says main() has closed the clients.
+     */
+    static void onShutdown(Runnable stop) {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (stopped.getCount() == 0) {
+                return; // the app is exiting on its own, e.g. after an error
+            }
+            log.info("Shutdown signal received, stopping ...");
+            stop.run();
+            try {
+                stopped.await(15, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }, "shutdown-hook"));
+    }
+
+    /** Tells the shutdown hook that main() has closed the clients. */
+    static void closed() {
+        stopped.countDown();
+    }
+
+    /** Exits with the given code without waiting in the shutdown hook. */
+    private static void exit(int status) {
+        stopped.countDown();
+        System.exit(status);
+    }
+
+    /** Logs the start line: which topics, which group, when the halt switch fires. */
+    static void logStart(String transfersTopic, String debitsTopic, String creditsTopic, String groupId,
+            Object transactionalId, long haltAt) {
+        Object halt = haltAt == 0 ? "never" : haltAt;
+        if (transactionalId == null) {
+            log.info("Booking '{}' -> '{}' and '{}' (group: {}, halt at transfer: {})",
+                    transfersTopic, debitsTopic, creditsTopic, groupId, halt);
+        } else {
+            log.info("Booking '{}' -> '{}' and '{}' (group: {}, transactional id: {}, halt at transfer: {})",
+                    transfersTopic, debitsTopic, creditsTopic, groupId, transactionalId, halt);
         }
+    }
+
+    /**
+     * Ends the run after the Kafka client refused to go on, e.g. while TODO 3
+     * or 4a of TransactionalApp is still open: logs, closes the producer and exits.
+     */
+    static void stopAfterClientError(Exception e, Producer<?, ?> producer) {
+        log.error("Stopped by the Kafka client: {}", e.toString());
+        // The producer may hold records it can never send (e.g. one outside a
+        // transaction); a normal close() would wait for them forever.
+        producer.close(Duration.ZERO);
+        exit(1);
     }
 
     /** Ends the run with a pointer to the lab text while TODO 1 or 2 of TransactionalApp is still open. */
     static void exitIfTransactionTodosOpen(Properties producerConfig, Properties consumerConfig) {
         if (producerConfig.get(ProducerConfig.TRANSACTIONAL_ID_CONFIG) == null) {
             log.error("The producer has no transactional id - TODO 1 is still open. See the lab text.");
-            System.exit(1);
+            exit(1);
         }
         if (!"false".equals(Objects.toString(consumerConfig.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG)))) {
             log.error("The consumer still commits on its own - TODO 2 is still open. See the lab text.");
-            System.exit(1);
+            exit(1);
         }
         if (!"read_committed".equals(Objects.toString(consumerConfig.get(ConsumerConfig.ISOLATION_LEVEL_CONFIG)))) {
             log.error("The consumer would also read transfers from aborted transactions - TODO 2 is still open. "
                     + "See the lab text.");
-            System.exit(1);
+            exit(1);
         }
     }
 
@@ -102,7 +153,7 @@ final class BookingSupport {
         } catch (ExecutionException e) {
             if (e.getCause() instanceof UnknownTopicOrPartitionException) {
                 log.error("The topic '{}' does not exist. Create it first, see the lab text.", topic);
-                System.exit(1);
+                exit(1);
             }
             throw e;
         }
@@ -186,6 +237,11 @@ final class BookingSupport {
         long total() {
             return booked;
         }
+
+        /** Logs the closing line. */
+        void logStopped() {
+            log.info("Stopped after booking {} transfers", booked);
+        }
     }
 
     /**
@@ -205,16 +261,16 @@ final class BookingSupport {
         }
 
         /**
-         * Call after every poll; it also logs the progress. Returns true if
-         * TODO 1 is still open. The group is then back where this run began,
-         * so no transfer is lost.
+         * Call after every poll; it also logs the progress. If TODO 1 is still
+         * open, it puts the group back where this run began, so no transfer is
+         * lost, closes both clients and exits.
          */
-        boolean todoStillOpen(ConsumerRecords<?, ?> records) {
+        void exitIfTodoOpen(ConsumerRecords<?, ?> records) {
             if (startOffsets.isEmpty() && !consumer.assignment().isEmpty()) {
                 startOffsets = offsetsAtStart();
             }
             if (!progress.afterPoll(records)) {
-                return false;
+                return;
             }
             producer.flush();
             double sent = producer.metrics().entrySet().stream()
@@ -224,7 +280,7 @@ final class BookingSupport {
                     .sum();
             long booked = progress.total();
             if (booked == 0 || sent > 0) {
-                return false;
+                return;
             }
             log.error("{} transfers read, but not a single booking sent - TODO 1 is still open. See the lab text.",
                     booked);
@@ -233,7 +289,11 @@ final class BookingSupport {
             // began, otherwise these transfers would be gone for good.
             startOffsets.forEach((partition, offset) -> consumer.seek(partition, offset.offset()));
             consumer.commitSync(startOffsets);
-            return true;
+            // Close first: the consumer leaves the group, so the next start
+            // does not wait for its session to time out.
+            producer.close();
+            consumer.close();
+            exit(1);
         }
 
         /** Where the group stood when this run began, so an aborted run can put it back. */

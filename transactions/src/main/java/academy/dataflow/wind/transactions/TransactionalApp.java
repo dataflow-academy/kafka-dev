@@ -26,8 +26,6 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Books transfers exactly once: the debit, the credit and the consumer offset
@@ -39,19 +37,12 @@ import org.slf4j.LoggerFactory;
  */
 public final class TransactionalApp {
 
-    private static final Logger log = LoggerFactory.getLogger(TransactionalApp.class);
-
     /** All three bank labs read from this one topic; TransferSource fills it. */
     private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer.event";
-    /** The bookings stay per lab, so the last lab's result stays readable. */
     private static final String DEBITS_TOPIC = "nordbank.payments.public.debit-transactions.event";
     private static final String CREDITS_TOPIC = "nordbank.payments.public.credit-transactions.event";
-
     private static final String GROUP_ID = "nordbank-booking-transactional";
-    /**
-     * The process dies while it books this transfer (counted from the start
-     * of this run), between the debit and the credit. 0 = never.
-     */
+    /** The process dies while it books this transfer of the run, between debit and credit. 0 = never. */
     private static final long HALT_AT_TRANSFER = 0;
 
     /** TODO 1: make the producer transactional. */
@@ -63,10 +54,7 @@ public final class TransactionalApp {
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaJsonSerializer.class);
-        // One transaction per transfer means the next one starts while the
-        // markers of the previous one are still being written. The broker
-        // answers CONCURRENT_TRANSACTIONS, and the client waits this long
-        // before trying again. The default of 100 ms dominates the runtime.
+        // Retry CONCURRENT_TRANSACTIONS sooner than the default 100 ms.
         props.put(ProducerConfig.RETRY_BACKOFF_MS_CONFIG, 10);
 
         // TODO 1: the transactional id. Which value? It decides what happens
@@ -104,30 +92,21 @@ public final class TransactionalApp {
 
         Consumer<String, BankTransfer> consumer = new KafkaConsumer<>(consumerConfig);
         Producer<String, Booking> producer = new KafkaProducer<>(producerConfig);
-        // Ctrl+C or Stop: end the loop, then let main() close the clients.
-        Thread main = Thread.currentThread();
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (!running) {
-                return; // the app is exiting on its own, e.g. after an error
-            }
-            log.info("Shutdown signal received, stopping ...");
+        // Ctrl+C or Stop: end the loop.
+        BookingSupport.onShutdown(() -> {
             running = false;
             consumer.wakeup();
-            BookingSupport.awaitExit(main);
-        }, "shutdown-hook"));
-
+        });
         // Lab helper: progress lines.
         BookingSupport.Progress progress = new BookingSupport.Progress();
-        boolean failed = false;
+
         try (consumer) {
             // TODO 3: once, before the first transaction: register the
             // transactional id with the broker.
 
             consumer.subscribe(List.of(TRANSFERS_TOPIC));
-            log.info("Booking '{}' -> '{}' and '{}' (group: {}, transactional id: {}, halt at transfer: {})",
-                    TRANSFERS_TOPIC, DEBITS_TOPIC, CREDITS_TOPIC, GROUP_ID,
-                    producerConfig.get(ProducerConfig.TRANSACTIONAL_ID_CONFIG),
-                    HALT_AT_TRANSFER == 0 ? "never" : HALT_AT_TRANSFER);
+            BookingSupport.logStart(TRANSFERS_TOPIC, DEBITS_TOPIC, CREDITS_TOPIC, GROUP_ID,
+                    producerConfig.get(ProducerConfig.TRANSACTIONAL_ID_CONFIG), HALT_AT_TRANSFER);
 
             while (running) {
                 ConsumerRecords<String, BankTransfer> records = consumer.poll(Duration.ofMillis(500));
@@ -156,24 +135,13 @@ public final class TransactionalApp {
         } catch (WakeupException e) {
             // shutdown
         } catch (KafkaException | IllegalStateException e) {
-            // Open TODOs 3 and 4a end up here too: the producer refuses to
-            // send without initTransactions() and beginTransaction().
-            log.error("Stopped by the Kafka client: {}", e.toString());
-            failed = true;
+            // Lab helper: open TODOs 3 and 4a end up here too.
+            BookingSupport.stopAfterClientError(e, producer);
         } finally {
-            if (failed) {
-                // The producer may hold records it can never send (e.g. one
-                // outside a transaction); close() would wait for them forever.
-                producer.close(Duration.ZERO);
-            } else {
-                producer.close();
-            }
-            running = false;
+            producer.close();
+            BookingSupport.closed(); // Lab helper: releases the shutdown hook.
         }
-        if (failed) {
-            System.exit(1);
-        }
-        log.info("Stopped after booking {} transfers", progress.total());
+        progress.logStopped();
     }
 
     private TransactionalApp() {
