@@ -10,9 +10,7 @@ import io.confluent.kafka.serializers.KafkaJsonSerializer;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -36,7 +34,8 @@ import org.slf4j.LoggerFactory;
  * go into one Kafka transaction. Either all three become visible or none.
  *
  * <p>The bookings are already there, in the same shape as in AtLeastOnceApp.
- * The TODOs are the transaction around them.
+ * The TODOs are the transaction around them. Calls into BookingSupport are
+ * lab helpers you can skip while reading.
  */
 public final class TransactionalApp {
 
@@ -96,43 +95,28 @@ public final class TransactionalApp {
     }
 
     private static volatile boolean running = true;
-    /** Counts down once the loop has ended, however it ended. */
-    private static final CountDownLatch stopped = new CountDownLatch(1);
 
     public static void main(String[] args) {
         Properties producerConfig = producerConfig();
         Properties consumerConfig = consumerConfig();
-        if (producerConfig.get(ProducerConfig.TRANSACTIONAL_ID_CONFIG) == null) {
-            log.error("The producer has no transactional id - TODO 1 is still open. See the lab text.");
-            System.exit(1);
-        }
-        if (!"false".equals(Objects.toString(consumerConfig.get(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG)))) {
-            log.error("The consumer still commits on its own - TODO 2 is still open. See the lab text.");
-            System.exit(1);
-        }
-        if (!"read_committed".equals(Objects.toString(consumerConfig.get(ConsumerConfig.ISOLATION_LEVEL_CONFIG)))) {
-            log.error("The consumer would also read transfers from aborted transactions - TODO 2 is still open. "
-                    + "See the lab text.");
-            System.exit(1);
-        }
+        // Lab helper: stops here while TODO 1 or 2 is still open.
+        BookingSupport.exitIfTransactionTodosOpen(producerConfig, consumerConfig);
 
         Consumer<String, BankTransfer> consumer = new KafkaConsumer<>(consumerConfig);
         Producer<String, Booking> producer = new KafkaProducer<>(producerConfig);
+        // Ctrl+C or Stop: end the loop, then let main() close the clients.
         Thread main = Thread.currentThread();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (!running || stopped.getCount() == 0) {
+            if (!running) {
                 return; // the app is exiting on its own, e.g. after an error
             }
             log.info("Shutdown signal received, stopping ...");
             running = false;
             consumer.wakeup();
-            try {
-                main.join(15_000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+            BookingSupport.awaitExit(main);
         }, "shutdown-hook"));
 
+        // Lab helper: progress lines.
         BookingSupport.Progress progress = new BookingSupport.Progress();
         boolean failed = false;
         try (consumer) {
@@ -147,10 +131,7 @@ public final class TransactionalApp {
 
             while (running) {
                 ConsumerRecords<String, BankTransfer> records = consumer.poll(Duration.ofMillis(500));
-                if (records.isEmpty()) {
-                    progress.idle();
-                    continue;
-                }
+                progress.afterPoll(records);
                 for (ConsumerRecord<String, BankTransfer> record : records) {
                     if (!running) {
                         break; // shutdown: the rest of this poll is read again next time
@@ -187,10 +168,9 @@ public final class TransactionalApp {
             } else {
                 producer.close();
             }
-            stopped.countDown();
+            running = false;
         }
         if (failed) {
-            running = false;
             System.exit(1);
         }
         log.info("Stopped after booking {} transfers", progress.total());

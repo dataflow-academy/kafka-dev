@@ -1,14 +1,8 @@
 package academy.dataflow.wind.streams;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Duration;
+import static academy.dataflow.wind.streams.StreamsSupport.hostname;
+
 import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
@@ -17,7 +11,6 @@ import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Produced;
@@ -28,7 +21,8 @@ import org.slf4j.LoggerFactory;
  * Books transfers with Kafka Streams: the same job as the transactional app,
  * without writing the transaction yourself.
  *
- * <p>Everything outside the TODOs is scaffolding and already works.
+ * <p>Everything outside the TODOs is scaffolding and already works. Calls
+ * into StreamsSupport are lab helpers you can skip while reading.
  */
 public final class StreamsApp {
 
@@ -75,8 +69,8 @@ public final class StreamsApp {
         StreamsBuilder builder = new StreamsBuilder();
         KStream<String, BankTransfer> transfers = builder
                 .stream(TRANSFERS_TOPIC, Consumed.with(keySerde, JsonSerde.of(BankTransfer.class)))
-                // The process dies here at HALT_AT_TRANSFER.
-                .peek(StreamsApp::countAndHaltIfDue);
+                // Lab helper: counts, and the process dies here at HALT_AT_TRANSFER.
+                .peek(StreamsSupport.countAndHaltAt(HALT_AT_TRANSFER));
 
         // TODO 2: the debits. Build a Booking for the paying account out of
         // every transfer and write it to DEBITS_TOPIC with
@@ -90,110 +84,17 @@ public final class StreamsApp {
 
     public static void main(String[] args) {
         Properties config = streamsConfig();
-        if (config.get(StreamsConfig.PROCESSING_GUARANTEE_CONFIG) == null) {
-            log.error("No processing guarantee set - TODO 1 is still open. See the lab text.");
-            System.exit(1);
-        }
+        // Lab helper: stops here while TODO 1 is still open.
+        StreamsSupport.exitIfNoGuarantee(config);
         Topology topology = buildTopology(config);
-        String description = topology.describe().toString();
-        publishTopology(description);
-        if (!description.contains(DEBITS_TOPIC) || !description.contains(CREDITS_TOPIC)) {
-            log.error("The topology does not write to both booking topics yet - TODO 2 and 3. See the lab text.");
-            System.exit(1);
-        }
+        // Lab helpers: topology.txt for the visualizer; stops here while TODO 2 or 3 is still open.
+        StreamsSupport.publishTopology(topology);
+        StreamsSupport.exitIfNotWritingTo(topology, DEBITS_TOPIC, CREDITS_TOPIC);
         log.info("Processing guarantee: {}, halt at transfer: {}",
                 config.get(StreamsConfig.PROCESSING_GUARANTEE_CONFIG),
                 HALT_AT_TRANSFER == 0 ? "never" : HALT_AT_TRANSFER);
-        runUntilShutdown(new KafkaStreams(topology, config));
-    }
-
-    /**
-     * Writes the topology to topology.txt in the working directory, so it can
-     * be opened and pasted into a visualizer. Also logs it.
-     */
-    private static void publishTopology(String description) {
-        log.info("Topology:\n{}", description);
-        Path file = Path.of(System.getProperty("user.dir"), "topology.txt").toAbsolutePath();
-        try {
-            Files.writeString(file, description);
-            log.info("Topology written to {}", file);
-        } catch (IOException e) {
-            log.warn("Could not write {}: {}", file, e.toString());
-        }
-    }
-
-    private static final AtomicLong processed = new AtomicLong();
-    private static volatile long lastReport = System.currentTimeMillis();
-
-    private static void countAndHaltIfDue(String key, BankTransfer transfer) {
-        long n = processed.incrementAndGet();
-        if (n == HALT_AT_TRANSFER) {
-            log.warn("HALT while processing transfer #{} of this run ({}). "
-                    + "Set HALT_AT_TRANSFER back to 0 before the next start.", n, transfer.transferId());
-            try {
-                // The crash has to hit an empty producer buffer, not a half
-                // full one: wait longer than linger.ms (100 ms in Streams) so
-                // that every booking made so far has really reached the
-                // broker. Without it the counts afterwards are pure chance.
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            Runtime.getRuntime().halt(1);
-        }
-        long now = System.currentTimeMillis();
-        if (now - lastReport >= 5000) {
-            log.info("{} transfers processed so far", n);
-            lastReport = now;
-        }
-    }
-
-    /** Starts the topology and blocks until Ctrl+C or until Streams dies. */
-    private static void runUntilShutdown(KafkaStreams streams) {
-        streams.setUncaughtExceptionHandler(exception -> {
-            log.error("Uncaught exception in a stream thread - shutting down", exception);
-            return StreamsUncaughtExceptionHandler.StreamThreadExceptionResponse.SHUTDOWN_CLIENT;
-        });
-        CountDownLatch stopped = new CountDownLatch(1);
-        streams.setStateListener((newState, oldState) -> {
-            log.info("State {} -> {}", oldState, newState);
-            if (newState == KafkaStreams.State.ERROR || newState == KafkaStreams.State.NOT_RUNNING) {
-                stopped.countDown();
-            }
-        });
-        CountDownLatch shutdownRequested = new CountDownLatch(1);
-        // Ctrl+C and Stop end up here. The hook does the whole shutdown and
-        // never waits for the main thread: during shutdown the JVM does not
-        // schedule it any more, so joining it would just burn the timeout.
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (stopped.getCount() == 0) {
-                return; // Streams has already stopped on its own
-            }
-            log.info("Shutdown signal received, closing Kafka Streams ...");
-            shutdownRequested.countDown();
-            streams.close(Duration.ofSeconds(30));
-            log.info("Stopped after processing {} transfers", processed.get());
-            stopped.countDown();
-        }, "shutdown-hook"));
-
-        streams.start();
-        try {
-            stopped.await();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        if (shutdownRequested.getCount() > 0) {
-            log.error("Kafka Streams stopped on its own (state: {})", streams.state());
-            System.exit(1);
-        }
-    }
-
-    private static String hostname() {
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
-            return "unknown-host";
-        }
+        // Lab helper: starts Streams, closes it cleanly on Ctrl+C or Stop.
+        StreamsSupport.runUntilShutdown(new KafkaStreams(topology, config));
     }
 
     private StreamsApp() {
