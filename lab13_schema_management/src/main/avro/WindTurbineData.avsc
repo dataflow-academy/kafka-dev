@@ -1,6 +1,0 @@
-{
-  "namespace": "wind",
-  "type": "record",
-  "name": "WindTurbineData",
-  "fields": []
-}
