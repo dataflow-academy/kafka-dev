@@ -73,7 +73,7 @@ public final class JoinApp {
         KStream<String, EnrichedMeasurement> withCapacityFactor = null;
 
         // Lab helper: stops with a hint while a TODO is still open.
-        StreamsSupport.requireTodos("No join yet", 1, registry, enriched, withCapacityFactor);
+        StreamsSupport.exitIfTodosOpen("No join yet", 1, registry, enriched, withCapacityFactor);
 
         withCapacityFactor
                 // Lab helper: counts for the ten-second report.
@@ -85,18 +85,13 @@ public final class JoinApp {
 
     public static void main(String[] args) {
         Topology topology = buildTopology();
-        // Lab helper: writes topology.txt and checks the topics.
+        // Lab helpers: topology.txt for the visualizer, topic check, start line.
         StreamsSupport.publishTopology(topology);
-
         Map<String, Integer> partitions =
                 StreamsSupport.requireTopics(BOOTSTRAP_SERVERS, TELEMETRY_TOPIC, REGISTRY_TOPIC, OUTPUT_TOPIC);
-        log.info("Enriching '{}' ({} partitions) with '{}' ({} partitions) -> '{}'",
-                TELEMETRY_TOPIC, partitions.get(TELEMETRY_TOPIC),
-                REGISTRY_TOPIC, partitions.get(REGISTRY_TOPIC), OUTPUT_TOPIC);
-
-        // Lab helper: logs the counts every ten seconds.
+        StreamsSupport.logJoinStart(partitions, TELEMETRY_TOPIC, REGISTRY_TOPIC, OUTPUT_TOPIC);
+        // Lab helpers: counts every ten seconds; starts Kafka Streams, closes it on Ctrl+C.
         StreamsSupport.reportEveryTenSeconds();
-        // Lab helper: starts Kafka Streams and closes it on Ctrl+C.
         StreamsSupport.runUntilShutdown(new KafkaStreams(topology, streamsConfig()));
     }
 

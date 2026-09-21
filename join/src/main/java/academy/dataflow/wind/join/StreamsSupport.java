@@ -64,7 +64,7 @@ final class StreamsSupport {
      * Stops with "TODO n is still open" while one of the TODO results is
      * still null; the first result belongs to TODO {@code firstTodo}.
      */
-    static void requireTodos(String what, int firstTodo, Object... results) {
+    static void exitIfTodosOpen(String what, int firstTodo, Object... results) {
         for (int i = 0; i < results.length; i++) {
             if (results[i] == null) {
                 log.error("{} - TODO {} is still open. See the lab text.", what, firstTodo + i);
@@ -74,7 +74,7 @@ final class StreamsSupport {
     }
 
     /** Stops with the given hint while the topology writes to no topic at all. */
-    static void requireSink(Topology topology, String hint) {
+    static void exitIfNotWritingToATopic(Topology topology, String hint) {
         boolean writesToATopic = topology.describe().subtopologies().stream()
                 .flatMap(subtopology -> subtopology.nodes().stream())
                 .anyMatch(node -> node instanceof TopologyDescription.Sink);
@@ -196,6 +196,14 @@ final class StreamsSupport {
     static ForeachAction<String, EnrichedMeasurement> countEnriched() {
         return (turbineId, measurement) ->
                 (measurement.ratedPowerKw() == null ? withoutMasterData : joined).incrementAndGet();
+    }
+
+    /** Logs which topics the app joins, with their partition counts. */
+    static void logJoinStart(Map<String, Integer> partitions, String telemetryTopic, String registryTopic,
+            String outputTopic) {
+        log.info("Enriching '{}' ({} partitions) with '{}' ({} partitions) -> '{}'",
+                telemetryTopic, partitions.get(telemetryTopic),
+                registryTopic, partitions.get(registryTopic), outputTopic);
     }
 
     /** Logs every ten seconds how many measurements came in and how many found master data. */

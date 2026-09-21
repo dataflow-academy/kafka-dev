@@ -70,22 +70,21 @@ public final class AggregateApp {
         // for key and value, just like the input.
 
         // Lab helper: stops with a hint while TODO 2 is still open.
-        StreamsSupport.requireTodos("No aggregation yet", 2, averages);
+        StreamsSupport.exitIfTodosOpen("No aggregation yet", 2, averages);
         return builder.build();
     }
 
     public static void main(String[] args) {
         // Lab helper: tries add() with the numbers from the slide (TODO 1).
-        StreamsSupport.requireAverageWorks();
+        StreamsSupport.exitIfAverageWrong();
 
         Topology topology = buildTopology();
-        // Lab helper: stops while nothing writes to a topic (TODO 3).
-        StreamsSupport.requireSink(topology, "The topology writes nowhere - TODO 3 is still open");
-        // Lab helper: writes topology.txt and checks the topics.
+        // Lab helpers: stops while TODO 3 is open; topology.txt for the visualizer; topic check.
+        StreamsSupport.exitIfNotWritingToATopic(topology, "The topology writes nowhere - TODO 3 is still open");
         StreamsSupport.publishTopology(topology);
         StreamsSupport.requireTopics(BOOTSTRAP_SERVERS, INPUT_TOPIC, OUTPUT_TOPIC);
         log.info("Averaging '{}' -> '{}' (application.id: {})", INPUT_TOPIC, OUTPUT_TOPIC, APPLICATION_ID);
-        // Lab helper: starts Kafka Streams and closes it on Ctrl+C.
+        // Lab helper: starts Kafka Streams, closes it on Ctrl+C.
         StreamsSupport.runUntilShutdown(new KafkaStreams(topology, streamsConfig()));
     }
 

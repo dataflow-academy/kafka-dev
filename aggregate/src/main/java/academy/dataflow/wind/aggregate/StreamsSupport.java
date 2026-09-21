@@ -59,7 +59,7 @@ final class StreamsSupport {
      * Stops with "TODO n is still open" while one of the TODO results is
      * still null; the first result belongs to TODO {@code firstTodo}.
      */
-    static void requireTodos(String what, int firstTodo, Object... results) {
+    static void exitIfTodosOpen(String what, int firstTodo, Object... results) {
         for (int i = 0; i < results.length; i++) {
             if (results[i] == null) {
                 log.error("{} - TODO {} is still open. See the lab text.", what, firstTodo + i);
@@ -69,7 +69,7 @@ final class StreamsSupport {
     }
 
     /** Stops with the given hint while the topology writes to no topic at all. */
-    static void requireSink(Topology topology, String hint) {
+    static void exitIfNotWritingToATopic(Topology topology, String hint) {
         boolean writesToATopic = topology.describe().subtopologies().stream()
                 .flatMap(subtopology -> subtopology.nodes().stream())
                 .anyMatch(node -> node instanceof TopologyDescription.Sink);
@@ -182,7 +182,7 @@ final class StreamsSupport {
      * Stops with a hint unless {@link TurbinePowerAverage#add} turns the
      * numbers from the slide (1, 5, 3, 4) into the right average.
      */
-    static void requireAverageWorks() {
+    static void exitIfAverageWrong() {
         TurbinePowerAverage state = TurbinePowerAverage.empty();
         try {
             for (double powerKw : new double[] {1, 5, 3, 4}) {
