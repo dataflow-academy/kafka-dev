@@ -39,20 +39,23 @@ public final class OutboxApp {
     private static final long WORK_BETWEEN_WRITES_MS = 800;
     private static final long PAUSE_BETWEEN_ORDERS_MS = 200;
 
+    /** Set to false by the shutdown hook; the loop then ends after the current order. */
+    private static volatile boolean running = true;
+
     public static void main(String[] args) throws Exception {
         try (Connection db = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD)) {
             // TODO 2 (later in the lab): what has to change so that an order
             // and its event are committed together - or not at all?
 
             // Lab helper: tries TODO 1 once, rolls it back, stops if it fails.
-            OutboxSupport.requireOutboxInsert(db, OutboxApp::insertEvent);
-            // Lab helper: Ctrl+C lets the current order finish first.
-            OutboxSupport.finishCurrentOrderOnShutdown();
+            OutboxSupport.exitIfOutboxInsertFails(db, OutboxApp::insertEvent);
+            // Lab helper: on Ctrl+C, end the loop after the current order.
+            OutboxSupport.onShutdown(() -> running = false);
             log.info("Writing orders to maintenance_order and their events to outbox (autocommit: {})",
                     db.getAutoCommit());
 
             long orders = 0;
-            while (OutboxSupport.keepRunning()) {
+            while (running) {
                 // Lab helper: a made-up order and its name for the log.
                 MaintenanceOrder order = OutboxSupport.nextOrder();
                 String name = OutboxSupport.logName(order);

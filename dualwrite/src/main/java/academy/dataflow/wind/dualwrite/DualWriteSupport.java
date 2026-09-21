@@ -21,8 +21,6 @@ final class DualWriteSupport {
             "gearbox-inspection", "blade-inspection", "oil-change", "yaw-brake-service", "rotor-bolt-check");
     private static final Random random = new Random();
 
-    private static volatile boolean running = true;
-
     /** Makes up a maintenance order for one of the 50 turbines of the fleet. */
     static MaintenanceOrder nextOrder() {
         String[] park = PARKS.get(random.nextInt(PARKS.size())).split(":");
@@ -40,28 +38,24 @@ final class DualWriteSupport {
     }
 
     /**
-     * Lets SIGTERM and Ctrl+C finish the current order before the app stops;
-     * {@code kill -9} still stops it on the spot.
+     * Installs a shutdown hook for SIGTERM and Ctrl+C: it logs, runs {@code stop}
+     * and waits until main() has finished the current order. {@code kill -9}
+     * still stops the app on the spot.
      */
-    static void finishCurrentOrderOnShutdown() {
+    static void onShutdown(Runnable stop) {
         Thread main = Thread.currentThread();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (!main.isAlive()) {
-                return;
+                return; // main() has already ended, e.g. after an exception
             }
             log.info("Shutdown signal received, finishing the current order ...");
-            running = false;
+            stop.run();
             try {
                 main.join(15_000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }, "shutdown-hook"));
-    }
-
-    /** False once a shutdown signal has arrived. */
-    static boolean keepRunning() {
-        return running;
     }
 
     private DualWriteSupport() {

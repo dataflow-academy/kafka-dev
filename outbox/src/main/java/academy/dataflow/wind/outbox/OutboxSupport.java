@@ -26,8 +26,6 @@ final class OutboxSupport {
             "gearbox-inspection", "blade-inspection", "oil-change", "yaw-brake-service", "rotor-bolt-check");
     private static final Random random = new Random();
 
-    private static volatile boolean running = true;
-
     /** The outbox insert under test, as {@code OutboxApp::insertEvent}. */
     interface EventWriter {
         void write(Connection db, MaintenanceOrder order) throws SQLException, JsonProcessingException;
@@ -53,7 +51,7 @@ final class OutboxSupport {
      * Tries the outbox insert once with a made-up order and rolls it back, so a
      * missing or broken TODO 1 stops the app before it writes a single order.
      */
-    static void requireOutboxInsert(Connection db, EventWriter insertEvent) throws SQLException {
+    static void exitIfOutboxInsertFails(Connection db, EventWriter insertEvent) throws SQLException {
         boolean autoCommit = db.getAutoCommit();
         db.setAutoCommit(false);
         boolean works = false;
@@ -76,28 +74,24 @@ final class OutboxSupport {
     }
 
     /**
-     * Lets SIGTERM and Ctrl+C finish the current order before the app stops;
-     * {@code kill -9} still stops it on the spot.
+     * Installs a shutdown hook for SIGTERM and Ctrl+C: it logs, runs {@code stop}
+     * and waits until main() has finished the current order. {@code kill -9}
+     * still stops the app on the spot.
      */
-    static void finishCurrentOrderOnShutdown() {
+    static void onShutdown(Runnable stop) {
         Thread main = Thread.currentThread();
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (!main.isAlive()) {
-                return;
+                return; // main() has already ended, e.g. after an exception
             }
             log.info("Shutdown signal received, finishing the current order ...");
-            running = false;
+            stop.run();
             try {
                 main.join(15_000);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }, "shutdown-hook"));
-    }
-
-    /** False once a shutdown signal has arrived. */
-    static boolean keepRunning() {
-        return running;
     }
 
     /** Counts the rows the current transaction sees in the outbox. */

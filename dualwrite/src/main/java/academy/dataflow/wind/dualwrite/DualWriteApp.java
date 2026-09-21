@@ -40,16 +40,19 @@ public final class DualWriteApp {
     private static final long WORK_BETWEEN_WRITES_MS = 800;
     private static final long PAUSE_BETWEEN_ORDERS_MS = 200;
 
+    /** Set to false by the shutdown hook; the loop then ends after the current order. */
+    private static volatile boolean running = true;
+
     public static void main(String[] args) throws Exception {
-        // Lab helper: Ctrl+C lets the current order finish first.
-        DualWriteSupport.finishCurrentOrderOnShutdown();
+        // Lab helper: on Ctrl+C, end the loop after the current order.
+        DualWriteSupport.onShutdown(() -> running = false);
 
         try (Connection db = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
              Producer<String, MaintenanceOrder> producer = new KafkaProducer<>(producerConfig())) {
             log.info("Writing orders to table maintenance_order and topic '{}'", TOPIC);
 
             long orders = 0;
-            while (DualWriteSupport.keepRunning()) {
+            while (running) {
                 // Lab helper: a made-up order and its name for the log.
                 MaintenanceOrder order = DualWriteSupport.nextOrder();
                 String name = DualWriteSupport.logName(order);
