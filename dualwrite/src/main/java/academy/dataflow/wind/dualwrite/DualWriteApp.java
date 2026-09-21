@@ -8,9 +8,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -42,21 +40,19 @@ public final class DualWriteApp {
     private static final long WORK_BETWEEN_WRITES_MS = 800;
     private static final long PAUSE_BETWEEN_ORDERS_MS = 200;
 
-    private static volatile boolean running = true;
-    private static final CountDownLatch stopped = new CountDownLatch(1);
-
     public static void main(String[] args) throws Exception {
-        MaintenancePlanner planner = new MaintenancePlanner();
-        installShutdownHook();
+        // Lab helper: Ctrl+C lets the current order finish first.
+        DualWriteSupport.finishCurrentOrderOnShutdown();
 
         try (Connection db = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD);
              Producer<String, MaintenanceOrder> producer = new KafkaProducer<>(producerConfig())) {
             log.info("Writing orders to table maintenance_order and topic '{}'", TOPIC);
 
             long orders = 0;
-            while (running) {
-                MaintenanceOrder order = planner.next();
-                String name = "order %s (%s)".formatted(order.orderId().substring(0, 8), order.windTurbineId());
+            while (DualWriteSupport.keepRunning()) {
+                // Lab helper: a made-up order and its name for the log.
+                MaintenanceOrder order = DualWriteSupport.nextOrder();
+                String name = DualWriteSupport.logName(order);
 
                 insert(db, order);
                 log.info("{}: database ✓", name);
@@ -70,8 +66,6 @@ public final class DualWriteApp {
                 Thread.sleep(PAUSE_BETWEEN_ORDERS_MS);
             }
             log.info("Stopped cleanly after {} orders", orders);
-        } finally {
-            stopped.countDown();
         }
     }
 
@@ -102,22 +96,6 @@ public final class DualWriteApp {
         props.put(ProducerConfig.ACKS_CONFIG, "all");
         props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
         return props;
-    }
-
-    /** SIGTERM and Ctrl+C finish the current order before the app stops. */
-    private static void installShutdownHook() {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (stopped.getCount() == 0) {
-                return;
-            }
-            log.info("Shutdown signal received, finishing the current order ...");
-            running = false;
-            try {
-                stopped.await(15, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }, "shutdown-hook"));
     }
 
     private DualWriteApp() {

@@ -6,12 +6,8 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,27 +39,23 @@ public final class OutboxApp {
     private static final long WORK_BETWEEN_WRITES_MS = 800;
     private static final long PAUSE_BETWEEN_ORDERS_MS = 200;
 
-    private static volatile boolean running = true;
-    private static final CountDownLatch stopped = new CountDownLatch(1);
-
     public static void main(String[] args) throws Exception {
-        MaintenancePlanner planner = new MaintenancePlanner();
-
         try (Connection db = DriverManager.getConnection(JDBC_URL, DB_USER, DB_PASSWORD)) {
             // TODO 2 (later in the lab): what has to change so that an order
             // and its event are committed together - or not at all?
 
-            if (!outboxInsertWorks(db, planner.next())) {
-                System.exit(1);
-            }
-            installShutdownHook();
+            // Lab helper: tries TODO 1 once, rolls it back, stops if it fails.
+            OutboxSupport.requireOutboxInsert(db, OutboxApp::insertEvent);
+            // Lab helper: Ctrl+C lets the current order finish first.
+            OutboxSupport.finishCurrentOrderOnShutdown();
             log.info("Writing orders to maintenance_order and their events to outbox (autocommit: {})",
                     db.getAutoCommit());
 
             long orders = 0;
-            while (running) {
-                MaintenanceOrder order = planner.next();
-                String name = "order %s (%s)".formatted(order.orderId().substring(0, 8), order.windTurbineId());
+            while (OutboxSupport.keepRunning()) {
+                // Lab helper: a made-up order and its name for the log.
+                MaintenanceOrder order = OutboxSupport.nextOrder();
+                String name = OutboxSupport.logName(order);
 
                 insertOrder(db, order);
                 log.info("{}: order written", name);
@@ -76,8 +68,6 @@ public final class OutboxApp {
                 Thread.sleep(PAUSE_BETWEEN_ORDERS_MS);
             }
             log.info("Stopped cleanly after {} orders", orders);
-        } finally {
-            stopped.countDown();
         }
     }
 
@@ -108,55 +98,6 @@ public final class OutboxApp {
         //     ...
         //     stmt.executeUpdate();
         // }
-    }
-
-    /**
-     * Tries TODO 1 once and rolls it back, so a missing or broken outbox
-     * insert stops the app before it writes a single order.
-     */
-    private static boolean outboxInsertWorks(Connection db, MaintenanceOrder probe) throws SQLException {
-        boolean autoCommit = db.getAutoCommit();
-        db.setAutoCommit(false);
-        try {
-            long before = countOutbox(db);
-            insertEvent(db, probe);
-            if (countOutbox(db) == before) {
-                log.error("TODO 1 is still open - see the lab text.");
-                return false;
-            }
-            return true;
-        } catch (SQLException | JsonProcessingException e) {
-            log.error("Cannot write to the outbox: {}", e.getMessage());
-            return false;
-        } finally {
-            db.rollback();
-            db.setAutoCommit(autoCommit);
-        }
-    }
-
-    /** Counts the rows the current transaction sees in the outbox. */
-    private static long countOutbox(Connection db) throws SQLException {
-        try (Statement stmt = db.createStatement();
-                ResultSet rs = stmt.executeQuery("SELECT count(*) FROM outbox")) {
-            rs.next();
-            return rs.getLong(1);
-        }
-    }
-
-    /** SIGTERM and Ctrl+C finish the current order before the app stops. */
-    private static void installShutdownHook() {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (stopped.getCount() == 0) {
-                return;
-            }
-            log.info("Shutdown signal received, finishing the current order ...");
-            running = false;
-            try {
-                stopped.await(15, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }, "shutdown-hook"));
     }
 
     private OutboxApp() {
