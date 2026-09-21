@@ -6,14 +6,10 @@ import com.fasterxml.jackson.databind.annotation.JsonNaming;
 /**
  * One telemetry measurement from a single wind turbine.
  *
- * <p>This is the JSON twin of {@code /schemas/wind_turbine_measurement.avsc} -
- * field names and semantics are identical, the ObjectMapper maps the Java
- * camelCase names to the cross-language snake_case wire format
+ * <p>Jackson maps the Java camelCase names to snake_case on the wire
  * ({@code wind_turbine_id}, {@code power_kw}, ...).
  *
- * @param windTurbineId unique turbine id, e.g. {@code alpha-ventus-07}; also
- *                      used as the Kafka record key so all measurements of one
- *                      turbine stay in order on the same partition
+ * @param windTurbineId unique turbine id, e.g. {@code alpha-ventus-07}
  * @param windParkId    the park this turbine belongs to, e.g. {@code alpha-ventus}
  * @param timestamp     event time in epoch milliseconds (UTC): when the turbine
  *                      measured. Deliberately carried in the payload and NOT

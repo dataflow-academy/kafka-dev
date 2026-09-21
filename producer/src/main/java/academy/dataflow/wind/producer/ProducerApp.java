@@ -2,13 +2,21 @@ package academy.dataflow.wind.producer;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.confluent.kafka.serializers.KafkaJsonSerializer;
+import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,9 +38,9 @@ public final class ProducerApp {
      */
     private static Properties producerConfig() {
         Properties props = new Properties();
-        props.put("bootstrap.servers", BOOTSTRAP_SERVERS);
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         // Makes this producer identifiable in broker logs, metrics and quotas.
-        props.put("client.id", hostname());
+        props.put(ProducerConfig.CLIENT_ID_CONFIG, hostname());
 
         // Serialization: the key is a plain string, the value is a
         // WindTurbineMeasurement. Which serializers do you need?
@@ -72,6 +80,7 @@ public final class ProducerApp {
         long produced = 0;
         long startedAt = System.currentTimeMillis();
         long lastReport = startedAt;
+        valueBytes = averageValueBytes(simulator.nextTick(Instant.now()));
 
         // TODO 2: create the producer and replace both '?' with the right
         // types. Look at what you are sending and at the serializers you
@@ -84,12 +93,10 @@ public final class ProducerApp {
         }
 
         // Ctrl+C does not kill the JVM on the spot: the hook below ends the
-        // loop and waits until close() has flushed what is still buffered.
+        // loop and waits until close() has sent what is still buffered.
         installShutdownHook();
 
-        // try-with-resources: close() flushes everything still buffered.
-        // A producer that is not closed loses whatever sits in its batches.
-        try (producer) {
+        try {
             log.info("Producing to '{}' every {} ms (bootstrap: {})",
                     TOPIC, TICK_INTERVAL_MS, BOOTSTRAP_SERVERS);
 
@@ -121,7 +128,7 @@ public final class ProducerApp {
                     // acknowledged, or when delivery failed for good - by then
                     // the client has already exhausted its internal retries.
                     // What now? The lab text has three options and one
-                    // anti-pattern; for "stop", call giveUp() below.
+                    // anti-pattern; for "stop", call giveUp(exception) below.
                     //
                     // producer.send(record, (metadata, exception) -> {
                     //     if (exception != null) {
@@ -145,10 +152,19 @@ public final class ProducerApp {
                 }
             }
 
-            // Flush first, so the summary covers every record, not just the
-            // ones that happened to be acknowledged when the loop ended.
-            producer.flush();
-            logSummary(producer, System.currentTimeMillis() - startedAt);
+            if (!fatalError.get()) {
+                if (running) {
+                    // A measurement run ended: flush, so the summary covers
+                    // every record, not just the ones acknowledged so far.
+                    producer.flush();
+                }
+                logSummary(producer, System.currentTimeMillis() - startedAt);
+            }
+        } finally {
+            // A producer that is not closed loses whatever sits in its batches.
+            // After giveUp() there is nothing worth waiting for: close at once
+            // and let the remaining sends fail. Otherwise give them 10 s.
+            producer.close(fatalError.get() ? Duration.ZERO : Duration.ofSeconds(10));
         }
         stopped.countDown();
 
@@ -160,37 +176,67 @@ public final class ProducerApp {
     }
 
     private static double lastRecords;
-    private static double lastBytes;
+    private static double lastRetries;
+    /** JSON value of an average measurement, before compression. */
+    private static double valueBytes;
 
     /**
      * Throughput since the last report and latency of the last 30 to 60
      * seconds, in the style of kafka-producer-perf-test. The numbers come from
-     * the producer's own metrics, so they count what was actually sent, not
-     * what was handed to send().
+     * the producer's own metrics, so they count what the brokers acknowledged,
+     * not what was handed to send().
      */
     private static void logProgress(Producer<?, ?> producer, double seconds) {
-        double records = metric(producer, "record-send-total");
-        double bytes = metric(producer, "outgoing-byte-total");
+        double records = acknowledged(producer);
+        double retries = metric(producer, "record-retry-total");
+        double recordsPerSec = Math.max(0, records - lastRecords) / seconds;
         double queued = metric(producer, "record-queue-time-avg");
         double request = metric(producer, "request-latency-avg");
-        log.info(String.format("%.0f records/sec (%.2f MB/sec on the wire), latency avg %.1f ms (%.1f queued + %.1f request), max %.0f ms",
-                (records - lastRecords) / seconds,
-                (bytes - lastBytes) / 1_000_000 / seconds,
+        String line = String.format("%.0f records/sec (%.2f MB/sec), latency avg %.1f ms (%.1f queued + %.1f request), max %.0f ms",
+                recordsPerSec,
+                recordsPerSec * valueBytes / 1_000_000,
                 queued + request, queued, request,
-                metric(producer, "record-queue-time-max") + metric(producer, "request-latency-max")));
+                metric(producer, "record-queue-time-max") + metric(producer, "request-latency-max"));
+        // The client logs every retry at WARN; logback.xml silences that, so
+        // they show up here instead.
+        if (retries > lastRetries) {
+            line += String.format(", %.0f retries/sec", (retries - lastRetries) / seconds);
+        }
+        log.info(line);
         lastRecords = records;
-        lastBytes = bytes;
+        lastRetries = retries;
     }
 
     private static void logSummary(Producer<?, ?> producer, long elapsedMs) {
         double seconds = Math.max(1, elapsedMs) / 1000.0;
-        double records = metric(producer, "record-send-total");
-        log.info(String.format("%.0f records sent in %.0f s, %.0f records/sec (%.2f MB/sec on the wire)",
-                records, seconds, records / seconds, metric(producer, "outgoing-byte-total") / 1_000_000 / seconds));
+        double records = acknowledged(producer);
+        log.info(String.format("%.0f records sent in %.0f s, %.0f records/sec (%.2f MB/sec)",
+                records, seconds, records / seconds,
+                records / seconds * valueBytes / 1_000_000));
         log.info(String.format("batches: avg %.0f bytes, %.1f records per request, compressed to %.0f %%",
                 metric(producer, "batch-size-avg"),
                 metric(producer, "records-per-request-avg"),
                 metric(producer, "compression-rate-avg") * 100));
+    }
+
+    private static double averageValueBytes(List<WindTurbineMeasurement> sample) {
+        ObjectMapper mapper = new ObjectMapper();
+        long total = 0;
+        for (WindTurbineMeasurement m : sample) {
+            try {
+                total += mapper.writeValueAsBytes(m).length;
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException(e);
+            }
+        }
+        return (double) total / sample.size();
+    }
+
+    /** Every send attempt ends acknowledged, retried or failed. */
+    private static double acknowledged(Producer<?, ?> producer) {
+        return metric(producer, "record-send-total")
+                - metric(producer, "record-retry-total")
+                - metric(producer, "record-error-total");
     }
 
     private static double metric(Producer<?, ?> producer, String name) {
@@ -220,15 +266,18 @@ public final class ProducerApp {
 
     /**
      * Call this from the failure branch of your delivery callback to stop the
-     * main loop and exit non-zero.
+     * main loop and exit non-zero. Only the first failure is logged: once the
+     * cluster is gone, every buffered record fails the same way.
      *
      * <p>Why a flag instead of System.exit() inside the callback: the callback
      * runs on the producer's single I/O thread. exit() would block that thread
      * while shutdown hooks run - and close() waits for exactly that thread to
      * drain. Deadlock.
      */
-    static void giveUp() {
-        fatalError.set(true);
+    static void giveUp(Exception cause) {
+        if (fatalError.compareAndSet(false, true)) {
+            log.error("Giving up after a failed send: {}", cause.toString());
+        }
     }
 
     private static String hostname() {

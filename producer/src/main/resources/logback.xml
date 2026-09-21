@@ -9,6 +9,8 @@
          start. WARN keeps the lab output readable; raise it to INFO when you
          want to see which settings actually arrived. -->
     <logger name="org.apache.kafka" level="WARN"/>
+    <!-- Logs every single retry. The progress line counts them instead. -->
+    <logger name="org.apache.kafka.clients.producer.internals.Sender" level="ERROR"/>
 
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
