@@ -1,20 +1,15 @@
 package academy.dataflow.wind.consumer;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
+import academy.dataflow.wind.consumer.ConsumerSupport.LoggingRebalanceListener;
 import io.confluent.kafka.serializers.KafkaJsonDeserializer;
 import io.confluent.kafka.serializers.KafkaJsonDeserializerConfig;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -22,7 +17,6 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.RecordDeserializationException;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
@@ -34,7 +28,8 @@ import org.slf4j.LoggerFactory;
  * Reads wind turbine telemetry and shows the current power per wind park.
  *
  * <p>Everything outside the TODOs is scaffolding and already works: the
- * overview, the rebalance logging, graceful shutdown. Yours are the
+ * overview, the rebalance logging, graceful shutdown. What only keeps the lab
+ * observable lives in {@link ConsumerSupport}. Yours are the
  * configuration, the consumer, the subscription, the poll loop and - in the
  * error handling lab - what happens when a record cannot be read.
  */
@@ -50,7 +45,7 @@ public final class ConsumerApp {
         Properties props = new Properties();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         // Makes this consumer identifiable in broker logs, metrics and quotas.
-        props.put(ConsumerConfig.CLIENT_ID_CONFIG, hostname());
+        props.put(ConsumerConfig.CLIENT_ID_CONFIG, ConsumerSupport.hostname());
         // The rebalance protocol with broker-side assignment. Use it from
         // Kafka 4.0 on; anything else is legacy.
         props.put(ConsumerConfig.GROUP_PROTOCOL_CONFIG, "consumer");
@@ -78,8 +73,6 @@ public final class ConsumerApp {
     private static final Duration POLL_TIMEOUT = Duration.ofSeconds(1);
 
     private static volatile boolean running = true;
-    /** Counted down once the consumer is closed. */
-    private static final CountDownLatch stopped = new CountDownLatch(1);
 
     public static void main(String[] args) {
         ParkOverview overview = new ParkOverview(GROUP_ID);
@@ -88,23 +81,22 @@ public final class ConsumerApp {
         // types. They have to match the deserializers from TODO 1.
         Consumer<?, ?> consumer = null; // new KafkaConsumer<>(consumerConfig())
 
-        if (consumer == null) {
-            log.error("No consumer yet - TODO 2 is still open. See the lab text.");
-            System.exit(1);
-        }
+        ConsumerSupport.exitIfMissing(consumer); // Lab helper: stops while TODO 2 is open.
 
-        installShutdownHook(consumer);
+        // Ctrl+C does not kill the JVM on the spot. poll() may be blocking, so
+        // the hook calls wakeup(), which makes poll() throw a WakeupException,
+        // and waits until main() has closed the consumer.
+        ConsumerSupport.onShutdown(() -> {
+            running = false;
+            consumer.wakeup();
+        });
 
-        boolean todoOpen = false;
         try {
             // TODO 3: subscribe to TOPIC. Pass new LoggingRebalanceListener(overview)
             // as the second argument, so you see which partitions this
             // instance gets.
 
-            if (consumer.subscription().isEmpty()) {
-                log.error("Not subscribed yet - TODO 3 is still open. See the lab text.");
-                todoOpen = true;
-            } else {
+            if (ConsumerSupport.subscribed(consumer)) { // Lab helper: complains while TODO 3 is open.
                 log.info("Reading '{}' as group '{}' (bootstrap: {})", TOPIC, GROUP_ID, BOOTSTRAP_SERVERS);
             }
 
@@ -126,10 +118,7 @@ public final class ConsumerApp {
             // TODO 5 - in the error handling lab: put a try/catch for
             // RecordDeserializationException around poll().
 
-            if (!todoOpen && !hasPolled(consumer)) {
-                log.error("No poll() yet - TODO 4 is still open. See the lab text.");
-                todoOpen = true;
-            }
+            ConsumerSupport.checkPolled(consumer); // Lab helper: complains while TODO 4 is open.
         } catch (WakeupException e) {
             // Thrown by poll() after consumer.wakeup(): the normal way out.
         } finally {
@@ -137,78 +126,9 @@ public final class ConsumerApp {
             // group at once, instead of making it wait for a timeout.
             consumer.close();
             log.info("Consumer closed");
-            stopped.countDown();
+            ConsumerSupport.closed(); // Lab helper: releases the shutdown hook.
         }
-        if (todoOpen) {
-            System.exit(1);
-        }
-    }
-
-    /** True once poll() has been called: the metric is -1 before that. */
-    private static boolean hasPolled(Consumer<?, ?> consumer) {
-        return consumer.metrics().entrySet().stream()
-                .filter(e -> e.getKey().name().equals("last-poll-seconds-ago"))
-                .anyMatch(e -> ((Number) e.getValue().metricValue()).doubleValue() >= 0);
-    }
-
-    /**
-     * Ctrl+C does not kill the JVM on the spot. poll() may be blocking, so
-     * the hook calls wakeup(), which makes poll() throw a WakeupException,
-     * and waits until main() has closed the consumer.
-     */
-    private static void installShutdownHook(Consumer<?, ?> consumer) {
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            if (stopped.getCount() == 0) {
-                return; // main() has already ended, e.g. after an exception
-            }
-            log.info("Shutdown signal received, stopping consumer ...");
-            running = false;
-            consumer.wakeup();
-            try {
-                stopped.await(15, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }, "shutdown-hook"));
-    }
-
-    /** Logs which partitions this instance gets and loses. */
-    static final class LoggingRebalanceListener implements ConsumerRebalanceListener {
-        private final ParkOverview overview;
-
-        LoggingRebalanceListener(ParkOverview overview) {
-            this.overview = overview;
-        }
-
-        @Override
-        public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-            if (!partitions.isEmpty()) {
-                log.info("Partitions assigned: {}", ParkOverview.numbers(partitions));
-            }
-            overview.assigned(partitions);
-        }
-
-        @Override
-        public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-            if (!partitions.isEmpty()) {
-                log.info("Partitions revoked: {}", ParkOverview.numbers(partitions));
-            }
-            overview.revoked(partitions);
-        }
-
-        @Override
-        public void onPartitionsLost(Collection<TopicPartition> partitions) {
-            log.warn("Partitions lost: {}", ParkOverview.numbers(partitions));
-            overview.revoked(partitions);
-        }
-    }
-
-    private static String hostname() {
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
-            return "unknown-host";
-        }
+        ConsumerSupport.exitIfTodoOpen(); // Lab helper: exit code 1 while a TODO is open.
     }
 
     private ConsumerApp() {

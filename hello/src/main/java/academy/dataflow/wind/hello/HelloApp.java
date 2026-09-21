@@ -1,7 +1,5 @@
 package academy.dataflow.wind.hello;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -33,7 +31,7 @@ public final class HelloApp {
     private static final String TOPIC = "hello";
 
     public static void main(String[] args) throws Exception {
-        String key = hostname();
+        String key = HelloSupport.hostname();
         String value = "Hello from " + key + " at " + Instant.now();
 
         RecordMetadata written = write(key, value);
@@ -77,14 +75,6 @@ public final class HelloApp {
                 }
             }
             throw new IllegalStateException("Offset " + offset + " did not come back within 10 s");
-        }
-    }
-
-    private static String hostname() {
-        try {
-            return InetAddress.getLocalHost().getHostName();
-        } catch (UnknownHostException e) {
-            return "unknown-host";
         }
     }
 
