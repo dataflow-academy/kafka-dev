@@ -34,7 +34,7 @@ public final class ProducerApp {
      */
     private static Properties producerConfig() {
         Properties props = new Properties();
-        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092,localhost:9093,localhost:9094");
         // Makes this producer identifiable in broker logs, metrics and quotas.
         props.put(ProducerConfig.CLIENT_ID_CONFIG, ProducerSupport.hostname());
 
@@ -56,7 +56,6 @@ public final class ProducerApp {
 
     private static final Logger log = LoggerFactory.getLogger(ProducerApp.class);
 
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
     private static final String TOPIC = "nordwind.scada.public.turbine-telemetry.event";
     /**
      * How often every turbine reports, in milliseconds. 0 removes the brake
@@ -83,7 +82,7 @@ public final class ProducerApp {
         ProducerSupport.onShutdown(() -> running = false);
 
         try {
-            ProducerSupport.logStart(TOPIC, TICK_INTERVAL_MS, BOOTSTRAP_SERVERS); // Lab helper: one start line.
+            ProducerSupport.logStart(TOPIC, TICK_INTERVAL_MS); // Lab helper: one start line.
 
             while (running && !ProducerSupport.gaveUp()) {
                 long tickStart = System.currentTimeMillis();

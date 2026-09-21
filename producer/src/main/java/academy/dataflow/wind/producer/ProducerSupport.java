@@ -66,8 +66,8 @@ final class ProducerSupport {
     }
 
     /** Logs where the producer writes to and how often. */
-    static void logStart(String topic, long tickIntervalMs, String bootstrapServers) {
-        log.info("Producing to '{}' every {} ms (bootstrap: {})", topic, tickIntervalMs, bootstrapServers);
+    static void logStart(String topic, long tickIntervalMs) {
+        log.info("Producing to '{}' every {} ms", topic, tickIntervalMs);
     }
 
     /** Starts the clock for the reports and measures how large a record value is. */

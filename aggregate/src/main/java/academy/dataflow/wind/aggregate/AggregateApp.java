@@ -26,7 +26,6 @@ public final class AggregateApp {
 
     private static final Logger log = LoggerFactory.getLogger(AggregateApp.class);
 
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
     private static final String INPUT_TOPIC = "nordwind.scada.public.turbine-telemetry.event";
     private static final String OUTPUT_TOPIC = "nordwind.scada.public.turbine-power-average.state";
     /** Consumer group, prefix of the internal topics, name of the state directory. */
@@ -40,7 +39,8 @@ public final class AggregateApp {
     private static final String STATE_DIR = System.getProperty("user.home") + "/kafka-streams";
 
     private static Properties streamsConfig() {
-        Properties props = StreamsSupport.baseConfig(BOOTSTRAP_SERVERS, APPLICATION_ID, STATE_DIR);
+        Properties props = StreamsSupport.baseConfig(APPLICATION_ID, STATE_DIR);
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092,localhost:9093,localhost:9094");
         props.put(StreamsConfig.COMMIT_INTERVAL_MS_CONFIG, COMMIT_INTERVAL_MS);
         return props;
     }
@@ -82,7 +82,7 @@ public final class AggregateApp {
         // Lab helpers: stops while TODO 3 is open; topology.txt for the visualizer; topic check.
         StreamsSupport.exitIfNotWritingToATopic(topology, "The topology writes nowhere - TODO 3 is still open");
         StreamsSupport.publishTopology(topology);
-        StreamsSupport.requireTopics(BOOTSTRAP_SERVERS, INPUT_TOPIC, OUTPUT_TOPIC);
+        StreamsSupport.requireTopics(INPUT_TOPIC, OUTPUT_TOPIC);
         log.info("Averaging '{}' -> '{}' (application.id: {})", INPUT_TOPIC, OUTPUT_TOPIC, APPLICATION_ID);
         // Lab helper: starts Kafka Streams, closes it on Ctrl+C.
         StreamsSupport.runUntilShutdown(new KafkaStreams(topology, streamsConfig()));

@@ -28,7 +28,6 @@ public final class StreamsApp {
 
     private static final Logger log = LoggerFactory.getLogger(StreamsApp.class);
 
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
     /** All three bank labs read from this one topic; TransferSource fills it. */
     private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer.event";
     /** The bookings stay per lab, so the last lab's result stays readable. */
@@ -47,7 +46,7 @@ public final class StreamsApp {
     /** TODO 1: the processing guarantee. */
     private static Properties streamsConfig() {
         Properties props = new Properties();
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092,localhost:9093,localhost:9094");
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, APPLICATION_ID);
         props.put(StreamsConfig.CLIENT_ID_CONFIG, hostname());
         props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG, 3);

@@ -22,8 +22,8 @@ solutions.
 ```
 
 Expects a Kafka cluster on `localhost:9092,9093,9094` and a producer writing
-to `nordwind.scada.public.turbine-telemetry.event`. Both are constants at the
-top of `ConsumerApp`.
+to `nordwind.scada.public.turbine-telemetry.event`. The brokers are set in
+`consumerConfig()`, the topic is a constant at the top of `ConsumerApp`.
 
 No producer at hand? `TelemetryFeed` is a finished one:
 

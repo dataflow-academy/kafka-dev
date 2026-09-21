@@ -18,7 +18,8 @@ solutions.
 ```
 
 Expects a Kafka cluster on `localhost:9092,9093,9094` and the topic
-`nordwind.scada.public.turbine-telemetry.event`. Both, and the tick interval,
-are constants at the top of `ProducerApp`.
+`nordwind.scada.public.turbine-telemetry.event`. The brokers are set in
+`producerConfig()`, topic and tick interval are constants at the top of
+`ProducerApp`.
 
 Java 25 or newer.

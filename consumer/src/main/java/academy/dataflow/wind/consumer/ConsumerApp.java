@@ -43,7 +43,7 @@ public final class ConsumerApp {
      */
     private static Properties consumerConfig() {
         Properties props = new Properties();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092,localhost:9093,localhost:9094");
         // Makes this consumer identifiable in broker logs, metrics and quotas.
         props.put(ConsumerConfig.CLIENT_ID_CONFIG, ConsumerSupport.hostname());
         // The rebalance protocol with broker-side assignment. Use it from
@@ -67,7 +67,6 @@ public final class ConsumerApp {
 
     private static final Logger log = LoggerFactory.getLogger(ConsumerApp.class);
 
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
     private static final String TOPIC = "nordwind.scada.public.turbine-telemetry.event";
     private static final String GROUP_ID = "turbine-overview";
     private static final Duration POLL_TIMEOUT = Duration.ofSeconds(1);
@@ -97,7 +96,7 @@ public final class ConsumerApp {
             // instance gets.
 
             if (ConsumerSupport.checkSubscribed(consumer)) { // Lab helper: complains while TODO 3 is open.
-                ConsumerSupport.logStart(TOPIC, GROUP_ID, BOOTSTRAP_SERVERS);
+                ConsumerSupport.logStart(TOPIC, GROUP_ID);
             }
 
             // TODO 4: read in a loop until `running` becomes false:
