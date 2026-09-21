@@ -19,10 +19,10 @@ import org.slf4j.LoggerFactory;
  * Produces wind turbine telemetry to Kafka.
  *
  * <p>Everything outside the TODOs is scaffolding and already works: the
- * simulator, the tick loop, graceful shutdown, logging. What only keeps the
- * lab observable lives in {@link ProducerSupport}. Four things are
- * yours: the configuration, the producer, the record you send, and what
- * happens when a send fails.
+ * simulator, the tick loop, logging. What only keeps the lab observable lives
+ * in {@link ProducerSupport}. Yours are the configuration, the producer, the
+ * record you send, what happens when a send fails, and - in the reliability
+ * lab - a clean shutdown.
  */
 public final class ProducerApp {
 
@@ -63,8 +63,6 @@ public final class ProducerApp {
      */
     private static final long TICK_INTERVAL_MS = 1000;
 
-    private static volatile boolean running = true;
-
     public static void main(String[] args) throws InterruptedException {
         WindParkSimulator simulator = new WindParkSimulator();
         long produced = 0;
@@ -77,14 +75,14 @@ public final class ProducerApp {
 
         ProducerSupport.exitIfMissing(producer); // Lab helper: stops while TODO 2 is open.
 
-        // Ctrl+C does not kill the JVM on the spot: the hook ends the loop and
-        // waits until close() has sent what is still buffered.
-        ProducerSupport.onShutdown(() -> running = false);
+        // TODO 5 - in the reliability lab: a clean shutdown. Make Ctrl+C end
+        // the loop below. ProducerSupport.onShutdown(...) runs your code when
+        // the JVM is asked to stop, and waits until the producer is closed.
 
         try {
             ProducerSupport.logStart(TOPIC, TICK_INTERVAL_MS); // Lab helper: one start line.
 
-            while (running && !ProducerSupport.gaveUp()) {
+            while (!ProducerSupport.gaveUp()) {
                 long tickStart = System.currentTimeMillis();
                 if (ProducerSupport.measurementOver(TICK_INTERVAL_MS)) {
                     break;
@@ -133,11 +131,9 @@ public final class ProducerApp {
             }
 
             if (!ProducerSupport.gaveUp()) {
-                if (running) {
-                    // A measurement run ended: flush, so the summary covers
-                    // every record, not just the ones acknowledged so far.
-                    producer.flush();
-                }
+                // Flush, so the summary covers every record, not just the
+                // ones acknowledged so far.
+                producer.flush();
                 ProducerSupport.logSummary(producer); // Lab helper: totals of the run.
             }
         } finally {
@@ -146,7 +142,6 @@ public final class ProducerApp {
             // and let the remaining sends fail. Otherwise give them 10 s.
             producer.close(ProducerSupport.gaveUp() ? Duration.ZERO : Duration.ofSeconds(10));
         }
-        ProducerSupport.closed(); // Lab helper: releases the shutdown hook.
         ProducerSupport.exit(produced); // Lab helper: exit code 1 after giveUp().
     }
 
