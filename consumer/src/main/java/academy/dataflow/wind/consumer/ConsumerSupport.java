@@ -31,14 +31,19 @@ final class ConsumerSupport {
         }
     }
 
-    /** Logs the start line once TODO 3 has subscribed, otherwise a hint for the exit code. */
-    static void checkSubscribed(Consumer<?, ?> consumer, String topic, String groupId, String bootstrapServers) {
+    /** True once TODO 3 has subscribed; otherwise logs a hint and remembers it for the exit code. */
+    static boolean checkSubscribed(Consumer<?, ?> consumer) {
         if (consumer.subscription().isEmpty()) {
             log.error("Not subscribed yet - TODO 3 is still open. See the lab text.");
             todoOpen = true;
-        } else {
-            log.info("Reading '{}' as group '{}' (bootstrap: {})", topic, groupId, bootstrapServers);
+            return false;
         }
+        return true;
+    }
+
+    /** Logs which topic the consumer reads and as which group. */
+    static void logStart(String topic, String groupId, String bootstrapServers) {
+        log.info("Reading '{}' as group '{}' (bootstrap: {})", topic, groupId, bootstrapServers);
     }
 
     /** Logs a hint when TODO 4 never called poll(), so the run does not look like a success. */

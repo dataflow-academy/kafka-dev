@@ -96,8 +96,9 @@ public final class ConsumerApp {
             // as the second argument, so you see which partitions this
             // instance gets.
 
-            // Lab helper: complains while TODO 3 is open, otherwise logs one start line.
-            ConsumerSupport.checkSubscribed(consumer, TOPIC, GROUP_ID, BOOTSTRAP_SERVERS);
+            if (ConsumerSupport.checkSubscribed(consumer)) { // Lab helper: complains while TODO 3 is open.
+                ConsumerSupport.logStart(TOPIC, GROUP_ID, BOOTSTRAP_SERVERS);
+            }
 
             // TODO 4: read in a loop until `running` becomes false:
             //
