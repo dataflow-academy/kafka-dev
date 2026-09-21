@@ -11,4 +11,6 @@ During the training you will experience and learn how to develop for Kafka in a 
 Not only will you gain necessary theoretical knowledge but also practical experience through numerous exercises.
 The focus is not only to impart know-how but also to promote the cohesion of the participants. This way you will achieve more together as a team.
 
+The labs of the previous edition of the training are on the branch `deprecated`.
+
 Interested? Contact me at anatoly@zelenin.de
