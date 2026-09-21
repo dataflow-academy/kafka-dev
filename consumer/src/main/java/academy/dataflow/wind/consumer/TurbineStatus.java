@@ -1,8 +1,0 @@
-package academy.dataflow.wind.consumer;
-
-/** Operational status of a turbine. */
-public enum TurbineStatus {
-    PRODUCING,
-    MAINTENANCE,
-    OFFLINE
-}
