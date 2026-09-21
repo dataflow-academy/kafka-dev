@@ -2,6 +2,7 @@ package academy.dataflow.wind.aggregate;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -137,19 +138,38 @@ final class StreamsSupport {
     }
 
     /**
-     * Writes the topology to topology.txt in the working directory, so it can
-     * be opened and pasted into a visualizer. Also logs it.
+     * Writes the topology to topology.txt in the lab folder, so it can be
+     * opened and pasted into a visualizer. Also logs it, with the path.
      */
     static void publishTopology(Topology topology) {
         String description = topology.describe().toString();
         log.info("Topology:\n{}", description);
-        Path file = Path.of(System.getProperty("user.dir"), "topology.txt").toAbsolutePath();
+        Path file = labFolder().resolve("topology.txt").toAbsolutePath();
         try {
             Files.writeString(file, description);
             log.info("Topology written to {}", file);
         } catch (IOException e) {
             log.warn("Could not write {}: {}", file, e.toString());
         }
+    }
+
+    /**
+     * The Gradle project this class was loaded from. VS Code starts the app in
+     * the workspace folder, so the working directory is not the lab folder.
+     */
+    private static Path labFolder() {
+        try {
+            Path location =
+                    Path.of(StreamsSupport.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            for (Path dir = location; dir != null; dir = dir.getParent()) {
+                if (Files.isRegularFile(dir.resolve("build.gradle.kts"))) {
+                    return dir;
+                }
+            }
+        } catch (URISyntaxException | RuntimeException e) {
+            log.debug("No lab folder on the class path, using the working directory: {}", e.toString());
+        }
+        return Path.of(System.getProperty("user.dir"));
     }
 
     /** Which tasks - and therefore which partitions - this instance works on. */
