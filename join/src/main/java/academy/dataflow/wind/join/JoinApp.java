@@ -2,10 +2,6 @@ package academy.dataflow.wind.join;
 
 import java.util.Map;
 import java.util.Properties;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.AutoOffsetReset;
@@ -41,11 +37,6 @@ public final class JoinApp {
     /** Where the local state stores live, one subdirectory per application.id. */
     private static final String STATE_DIR = System.getProperty("user.home") + "/kafka-streams";
 
-    /** Counted while the records flow through, logged every ten seconds. */
-    private static final AtomicLong measurementsIn = new AtomicLong();
-    private static final AtomicLong joined = new AtomicLong();
-    private static final AtomicLong withoutMasterData = new AtomicLong();
-
     private static Properties streamsConfig() {
         return StreamsSupport.baseConfig(BOOTSTRAP_SERVERS, APPLICATION_ID, STATE_DIR);
     }
@@ -63,7 +54,8 @@ public final class JoinApp {
         KStream<String, WindTurbineMeasurement> telemetry = builder
                 .stream(TELEMETRY_TOPIC, Consumed.with(stringSerde, measurementSerde)
                         .withOffsetResetPolicy(AutoOffsetReset.latest()))
-                .peek((turbineId, measurement) -> measurementsIn.incrementAndGet());
+                // Lab helper: counts for the ten-second report.
+                .peek(StreamsSupport.countMeasurementIn());
 
         // TODO 1: read REGISTRY_TOPIC as a table.
         KTable<String, WindTurbineRegistration> registry = null;
@@ -80,15 +72,12 @@ public final class JoinApp {
         // divide by.
         KStream<String, EnrichedMeasurement> withCapacityFactor = null;
 
-        if (registry == null || enriched == null || withCapacityFactor == null) {
-            int todo = registry == null ? 1 : enriched == null ? 2 : 3;
-            log.error("No join yet - TODO {} is still open. See the lab text.", todo);
-            System.exit(1);
-        }
+        // Lab helper: stops with a hint while a TODO is still open.
+        StreamsSupport.requireTodos("No join yet", 1, registry, enriched, withCapacityFactor);
 
         withCapacityFactor
-                .peek((turbineId, measurement) ->
-                        (measurement.ratedPowerKw() == null ? withoutMasterData : joined).incrementAndGet())
+                // Lab helper: counts for the ten-second report.
+                .peek(StreamsSupport.countEnriched())
                 .to(OUTPUT_TOPIC, Produced.with(stringSerde, enrichedSerde));
 
         return builder.build();
@@ -96,6 +85,7 @@ public final class JoinApp {
 
     public static void main(String[] args) {
         Topology topology = buildTopology();
+        // Lab helper: writes topology.txt and checks the topics.
         StreamsSupport.publishTopology(topology);
 
         Map<String, Integer> partitions =
@@ -104,16 +94,9 @@ public final class JoinApp {
                 TELEMETRY_TOPIC, partitions.get(TELEMETRY_TOPIC),
                 REGISTRY_TOPIC, partitions.get(REGISTRY_TOPIC), OUTPUT_TOPIC);
 
-        ScheduledExecutorService reporter = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread thread = new Thread(r, "reporter");
-            thread.setDaemon(true);
-            return thread;
-        });
-        reporter.scheduleAtFixedRate(() -> log.info(
-                "Last 10 s: {} measurements in, {} with master data, {} without",
-                measurementsIn.getAndSet(0), joined.getAndSet(0), withoutMasterData.getAndSet(0)),
-                10, 10, TimeUnit.SECONDS);
-
+        // Lab helper: logs the counts every ten seconds.
+        StreamsSupport.reportEveryTenSeconds();
+        // Lab helper: starts Kafka Streams and closes it on Ctrl+C.
         StreamsSupport.runUntilShutdown(new KafkaStreams(topology, streamsConfig()));
     }
 

@@ -14,6 +14,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -22,14 +26,16 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.ThreadMetadata;
 import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.TopologyDescription;
 import org.apache.kafka.streams.errors.LogAndContinueExceptionHandler;
 import org.apache.kafka.streams.errors.StreamsUncaughtExceptionHandler;
+import org.apache.kafka.streams.kstream.ForeachAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Scaffolding shared by the lab apps: topic check, lifecycle, logging.
- * Nothing in here is part of the exercise.
+ * Lab scaffolding — not part of the exercise. It keeps the lab observable and
+ * safe to break; you would not write this in a production client.
  */
 final class StreamsSupport {
 
@@ -52,6 +58,30 @@ final class StreamsSupport {
         props.put(StreamsConfig.DESERIALIZATION_EXCEPTION_HANDLER_CLASS_CONFIG,
                 LogAndContinueExceptionHandler.class);
         return props;
+    }
+
+    /**
+     * Stops with "TODO n is still open" while one of the TODO results is
+     * still null; the first result belongs to TODO {@code firstTodo}.
+     */
+    static void requireTodos(String what, int firstTodo, Object... results) {
+        for (int i = 0; i < results.length; i++) {
+            if (results[i] == null) {
+                log.error("{} - TODO {} is still open. See the lab text.", what, firstTodo + i);
+                System.exit(1);
+            }
+        }
+    }
+
+    /** Stops with the given hint while the topology writes to no topic at all. */
+    static void requireSink(Topology topology, String hint) {
+        boolean writesToATopic = topology.describe().subtopologies().stream()
+                .flatMap(subtopology -> subtopology.nodes().stream())
+                .anyMatch(node -> node instanceof TopologyDescription.Sink);
+        if (!writesToATopic) {
+            log.error("{}. See the lab text.", hint);
+            System.exit(1);
+        }
     }
 
     /**
@@ -151,6 +181,34 @@ final class StreamsSupport {
         } catch (IOException e) {
             log.warn("Could not write {}: {}", file, e.toString());
         }
+    }
+
+    private static final AtomicLong measurementsIn = new AtomicLong();
+    private static final AtomicLong joined = new AtomicLong();
+    private static final AtomicLong withoutMasterData = new AtomicLong();
+
+    /** Counts every measurement that comes in, for the ten-second report. */
+    static <K, V> ForeachAction<K, V> countMeasurementIn() {
+        return (key, value) -> measurementsIn.incrementAndGet();
+    }
+
+    /** Counts every output record, with or without master data, for the ten-second report. */
+    static ForeachAction<String, EnrichedMeasurement> countEnriched() {
+        return (turbineId, measurement) ->
+                (measurement.ratedPowerKw() == null ? withoutMasterData : joined).incrementAndGet();
+    }
+
+    /** Logs every ten seconds how many measurements came in and how many found master data. */
+    static void reportEveryTenSeconds() {
+        ScheduledExecutorService reporter = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread thread = new Thread(r, "reporter");
+            thread.setDaemon(true);
+            return thread;
+        });
+        reporter.scheduleAtFixedRate(() -> log.info(
+                "Last 10 s: {} measurements in, {} with master data, {} without",
+                measurementsIn.getAndSet(0), joined.getAndSet(0), withoutMasterData.getAndSet(0)),
+                10, 10, TimeUnit.SECONDS);
     }
 
     /**

@@ -35,20 +35,4 @@ public record TurbinePowerAverage(
         // TODO 1: return the new state. Count, sum and average all change.
         throw new UnsupportedOperationException("TODO 1 is still open");
     }
-
-    /** Feeds the numbers from the slide through add() and compares. */
-    static String selfCheck() {
-        TurbinePowerAverage state = empty();
-        try {
-            for (double powerKw : new double[] {1, 5, 3, 4}) {
-                state = state.add(new WindTurbineMeasurement(
-                        "self-check-01", "self-check", 0, 10.0, powerKw, TurbineStatus.PRODUCING));
-            }
-        } catch (UnsupportedOperationException e) {
-            return e.getMessage();
-        }
-        TurbinePowerAverage expected = new TurbinePowerAverage("self-check-01", 4, 13.0, 3.25);
-        return state.equals(expected) ? null : "add() is not right yet: 1, 5, 3, 4 should give "
-                + expected + ", but gave " + state;
-    }
 }

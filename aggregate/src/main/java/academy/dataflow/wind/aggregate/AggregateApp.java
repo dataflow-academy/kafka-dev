@@ -7,7 +7,6 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.TopologyDescription;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.KTable;
@@ -70,36 +69,24 @@ public final class AggregateApp {
         // has no to() - turn it into a stream first. The output needs serdes
         // for key and value, just like the input.
 
-        if (averages == null) {
-            log.error("No aggregation yet - TODO 2 is still open. See the lab text.");
-            System.exit(1);
-        }
+        // Lab helper: stops with a hint while TODO 2 is still open.
+        StreamsSupport.requireTodos("No aggregation yet", 2, averages);
         return builder.build();
     }
 
     public static void main(String[] args) {
-        String todo1 = TurbinePowerAverage.selfCheck();
-        if (todo1 != null) {
-            log.error("{}. See the lab text.", todo1);
-            System.exit(1);
-        }
+        // Lab helper: tries add() with the numbers from the slide (TODO 1).
+        StreamsSupport.requireAverageWorks();
 
         Topology topology = buildTopology();
-        if (!writesToATopic(topology)) {
-            log.error("The topology writes nowhere - TODO 3 is still open. See the lab text.");
-            System.exit(1);
-        }
+        // Lab helper: stops while nothing writes to a topic (TODO 3).
+        StreamsSupport.requireSink(topology, "The topology writes nowhere - TODO 3 is still open");
+        // Lab helper: writes topology.txt and checks the topics.
         StreamsSupport.publishTopology(topology);
-
         StreamsSupport.requireTopics(BOOTSTRAP_SERVERS, INPUT_TOPIC, OUTPUT_TOPIC);
         log.info("Averaging '{}' -> '{}' (application.id: {})", INPUT_TOPIC, OUTPUT_TOPIC, APPLICATION_ID);
+        // Lab helper: starts Kafka Streams and closes it on Ctrl+C.
         StreamsSupport.runUntilShutdown(new KafkaStreams(topology, streamsConfig()));
-    }
-
-    private static boolean writesToATopic(Topology topology) {
-        return topology.describe().subtopologies().stream()
-                .flatMap(subtopology -> subtopology.nodes().stream())
-                .anyMatch(node -> node instanceof TopologyDescription.Sink);
     }
 
     private AggregateApp() {
