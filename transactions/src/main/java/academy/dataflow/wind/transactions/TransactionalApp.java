@@ -42,8 +42,9 @@ public final class TransactionalApp {
 
     private static final Logger log = LoggerFactory.getLogger(TransactionalApp.class);
 
-    /** This lab has its own topics, so the last lab's result stays readable. */
-    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer-transactions.event";
+    /** All three bank labs read from this one topic; TransferSource fills it. */
+    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer.event";
+    /** The bookings stay per lab, so the last lab's result stays readable. */
     private static final String DEBITS_TOPIC = "nordbank.payments.public.debit-transactions.event";
     private static final String CREDITS_TOPIC = "nordbank.payments.public.credit-transactions.event";
 

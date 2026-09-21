@@ -42,8 +42,9 @@ public final class AtLeastOnceApp {
 
     private static final Logger log = LoggerFactory.getLogger(AtLeastOnceApp.class);
 
-    /** This lab has its own topics, so its result stays readable afterwards. */
-    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer-at-least-once.event";
+    /** All three bank labs read from this one topic; TransferSource fills it. */
+    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer.event";
+    /** The bookings stay per lab, so this lab's result stays readable afterwards. */
     private static final String DEBITS_TOPIC = "nordbank.payments.public.debit-at-least-once.event";
     private static final String CREDITS_TOPIC = "nordbank.payments.public.credit-at-least-once.event";
 

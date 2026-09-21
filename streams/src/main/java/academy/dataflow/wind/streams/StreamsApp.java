@@ -35,8 +35,9 @@ public final class StreamsApp {
     private static final Logger log = LoggerFactory.getLogger(StreamsApp.class);
 
     private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
-    /** This lab has its own topics, so the last lab's result stays readable. */
-    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer-streams.event";
+    /** All three bank labs read from this one topic; TransferSource fills it. */
+    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer.event";
+    /** The bookings stay per lab, so the last lab's result stays readable. */
     private static final String DEBITS_TOPIC = "nordbank.payments.public.debit-streams.event";
     private static final String CREDITS_TOPIC = "nordbank.payments.public.credit-streams.event";
     /** Also the consumer group and the transactional id prefix. */

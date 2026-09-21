@@ -20,7 +20,7 @@ solutions.
 ```
 
 Expects a Kafka cluster on `localhost:9092,9093,9094` and the topics
-`nordbank.payments.public.transfer-streams.event`,
+`nordbank.payments.public.transfer.event` (shared by all three bank labs),
 `nordbank.payments.public.debit-streams.event` and
 `nordbank.payments.public.credit-streams.event`.
 

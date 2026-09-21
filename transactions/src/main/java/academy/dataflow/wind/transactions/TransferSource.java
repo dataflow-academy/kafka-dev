@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -14,6 +15,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,22 +25,18 @@ import org.slf4j.LoggerFactory;
  * stops. Nothing to fill in.
  *
  * <p>A fixed number makes the result countable: after booking, the debit topic
- * and the credit topic must each hold exactly as many records as there are
- * transfers. Every run adds another batch with fresh transfer ids to the
- * transfer topic of every lab.
+ * and the credit topic must each hold exactly as many records as this run
+ * produced. Every run appends another batch with fresh transfer ids, so the
+ * topic keeps growing across the three labs.
  */
 public final class TransferSource {
 
     private static final Logger log = LoggerFactory.getLogger(TransferSource.class);
 
     private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
-    /**
-     * Every lab has its own transfer topic, so its result stays readable
-     * afterwards. Each run writes the same transfers into every transfer topic
-     * that exists - the lab you are in has just created its own.
-     */
-    private static final String TRANSFERS_TOPIC_PREFIX = "nordbank.payments.public.transfer-";
-    /** How many transfers one run writes, into each of the topics above. */
+    /** All three bank labs read their transfers from this one topic. */
+    private static final String TRANSFERS_TOPIC = "nordbank.payments.public.transfer.event";
+    /** How many transfers one run writes. */
     private static final int TRANSFERS = 1000;
 
     private static final List<String> ACCOUNTS = List.of(
@@ -46,17 +44,16 @@ public final class TransferSource {
             "grace", "heidi", "ivan", "judy", "mallory", "oscar");
 
     public static void main(String[] args) throws Exception {
-        List<String> topics;
+        // The broker would create the topic on the first send, with one
+        // partition and no replicas. Better to stop and say so.
         try (Admin admin = Admin.create(Map.of(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS))) {
-            topics = admin.listTopics().names().get().stream()
-                    .filter(t -> t.startsWith(TRANSFERS_TOPIC_PREFIX) && t.endsWith(".event"))
-                    .sorted()
-                    .toList();
-        }
-        if (topics.isEmpty()) {
-            log.error("No topic starting with '{}' exists yet. Create the topics first, see the lab text.",
-                    TRANSFERS_TOPIC_PREFIX);
-            System.exit(1);
+            admin.describeTopics(List.of(TRANSFERS_TOPIC)).allTopicNames().get();
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof UnknownTopicOrPartitionException) {
+                log.error("The topic '{}' does not exist. Create it first, see the lab text.", TRANSFERS_TOPIC);
+                System.exit(1);
+            }
+            throw e;
         }
 
         Properties props = new Properties();
@@ -86,14 +83,12 @@ public final class TransferSource {
                 BankTransfer transfer = new BankTransfer(
                         String.format("tx-%s-%04d", run, i), from, to, amountCents, System.currentTimeMillis());
 
-                for (String topic : topics) {
-                    // Keyed by the paying account: all orders of one customer stay in order.
-                    producer.send(new ProducerRecord<>(topic, from, transfer), (metadata, exception) -> {
-                        if (exception != null && failed.compareAndSet(false, true)) {
-                            log.error("Could not write a transfer: {}", exception.toString());
-                        }
-                    });
-                }
+                // Keyed by the paying account: all orders of one customer stay in order.
+                producer.send(new ProducerRecord<>(TRANSFERS_TOPIC, from, transfer), (metadata, exception) -> {
+                    if (exception != null && failed.compareAndSet(false, true)) {
+                        log.error("Could not write a transfer: {}", exception.toString());
+                    }
+                });
                 totalCents += amountCents;
             }
             producer.flush();
@@ -101,9 +96,9 @@ public final class TransferSource {
         if (failed.get()) {
             System.exit(1);
         }
-        log.info("Wrote {} transfers (ids tx-{}-0001 to tx-{}-{}), {} EUR in total, to each of {}",
+        log.info("Wrote {} transfers (ids tx-{}-0001 to tx-{}-{}), {} EUR in total, to {}",
                 TRANSFERS, run, run, String.format("%04d", TRANSFERS),
-                String.format("%.2f", totalCents / 100.0), topics);
+                String.format("%.2f", totalCents / 100.0), TRANSFERS_TOPIC);
     }
 
     private TransferSource() {
