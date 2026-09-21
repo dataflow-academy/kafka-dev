@@ -1,0 +1,16 @@
+{
+  "name": "turbine-registry-jdbc",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSourceConnector",
+    "connection.url": "jdbc:postgresql://localhost:5432/user",
+    "connection.user": "jdbc_reader",
+    "connection.password": "jdbc_reader",
+    "table.whitelist": "turbine_registry",
+    "mode": "incrementing",
+    "incrementing.column.name": "id",
+    "poll.interval.ms": "2000",
+    "topic.prefix": "nordwind.assets.private.jdbc.",
+    "topic.creation.default.partitions": "3",
+    "topic.creation.default.replication.factor": "3"
+  }
+}

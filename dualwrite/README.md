@@ -1,0 +1,24 @@
+# Dual write lab
+
+A maintenance planning service that writes every new order to Postgres and
+sends it to Kafka — two writes without a transaction around both.
+
+Nothing to fill in. Run it, kill it between the two writes, and compare the
+table with the topic.
+
+The lab text on the training platform has the tasks, the hints and the
+solutions.
+
+## Run
+
+```bash
+psql -f maintenance-order.sql
+./gradlew run
+```
+
+Expects Postgres on `localhost:5432` (database `user`) and a Kafka cluster on
+`localhost:9092,9093,9094`. Topic and connection are constants at the top of
+`DualWriteApp`, the order of the two writes is the order of the statements in
+`main`.
+
+Java 25 or newer.
