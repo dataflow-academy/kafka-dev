@@ -22,8 +22,11 @@ psql -f outbox.sql
 ./gradlew run
 ```
 
-Expects Postgres on `localhost:5432` (database `user`, `wal_level=logical`),
-Kafka Connect with the Debezium Postgres connector on `localhost:8090`, and a
-Kafka cluster on `localhost:9092,9093,9094`.
+Expects Postgres on `localhost:5432` with `wal_level=logical`, Kafka Connect
+with the Debezium Postgres connector on `localhost:8090`, and a Kafka cluster on
+`localhost:9092,9093,9094`. The app uses the database named after your account,
+the one `psql` uses without arguments. The connector configuration names that
+database `user`; on another machine, change `database.dbname` to your account
+name.
 
 Java 25 or newer.

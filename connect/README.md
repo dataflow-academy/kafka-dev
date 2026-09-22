@@ -13,5 +13,8 @@ each connector sees and what it misses.
 The lab text on the training platform has the tasks, the hints and the
 solutions.
 
-Expects Postgres on `localhost:5432` (database `user`, `wal_level=logical`)
-and Kafka Connect with both connector plugins on `localhost:8090`.
+Expects Postgres on `localhost:5432` with `wal_level=logical`, and Kafka
+Connect with both connector plugins on `localhost:8090`. The SQL file goes into
+the database named after your account, the one `psql` uses without arguments.
+The two connector configurations name that database `user`; on another machine,
+change `connection.url` and `database.dbname` to your account name.
