@@ -28,7 +28,8 @@ public final class DualWriteApp {
     private static final Logger log = LoggerFactory.getLogger(DualWriteApp.class);
 
     private static final String TOPIC = "nordwind.maintenance.private.maintenance-order.event";
-    private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/user";
+    /** The database named after your account, the one psql uses without arguments. */
+    private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/" + System.getProperty("user.name");
     private static final String DB_USER = "planning";
     private static final String DB_PASSWORD = "planning";
 

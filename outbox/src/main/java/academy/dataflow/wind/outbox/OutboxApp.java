@@ -25,7 +25,8 @@ public final class OutboxApp {
     private static final Logger log = LoggerFactory.getLogger(OutboxApp.class);
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/user";
+    /** The database named after your account, the one psql uses without arguments. */
+    private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/" + System.getProperty("user.name");
     private static final String DB_USER = "planning";
     private static final String DB_PASSWORD = "planning";
 
