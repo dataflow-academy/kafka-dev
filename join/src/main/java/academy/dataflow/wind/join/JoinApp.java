@@ -7,6 +7,7 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.AutoOffsetReset;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsBuilder;
+import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
@@ -28,7 +29,6 @@ public final class JoinApp {
 
     private static final Logger log = LoggerFactory.getLogger(JoinApp.class);
 
-    private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
     private static final String TELEMETRY_TOPIC = "nordwind.scada.public.turbine-telemetry.event";
     private static final String REGISTRY_TOPIC = "nordwind.assets.public.turbine-registry.state";
     private static final String OUTPUT_TOPIC = "nordwind.scada.public.turbine-telemetry-enriched.event";
@@ -38,7 +38,9 @@ public final class JoinApp {
     private static final String STATE_DIR = System.getProperty("user.home") + "/kafka-streams";
 
     private static Properties streamsConfig() {
-        return StreamsSupport.baseConfig(BOOTSTRAP_SERVERS, APPLICATION_ID, STATE_DIR);
+        Properties props = StreamsSupport.baseConfig(APPLICATION_ID, STATE_DIR);
+        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092,localhost:9093,localhost:9094");
+        return props;
     }
 
     private static Topology buildTopology() {
@@ -88,7 +90,7 @@ public final class JoinApp {
         // Lab helpers: topology.txt for the visualizer, topic check, start line.
         StreamsSupport.publishTopology(topology);
         Map<String, Integer> partitions =
-                StreamsSupport.requireTopics(BOOTSTRAP_SERVERS, TELEMETRY_TOPIC, REGISTRY_TOPIC, OUTPUT_TOPIC);
+                StreamsSupport.requireTopics(TELEMETRY_TOPIC, REGISTRY_TOPIC, OUTPUT_TOPIC);
         StreamsSupport.logJoinStart(partitions, TELEMETRY_TOPIC, REGISTRY_TOPIC, OUTPUT_TOPIC);
         // Lab helpers: counts every ten seconds; starts Kafka Streams, closes it on Ctrl+C.
         StreamsSupport.reportEveryTenSeconds();

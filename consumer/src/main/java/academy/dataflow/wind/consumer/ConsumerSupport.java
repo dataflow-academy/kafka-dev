@@ -42,8 +42,8 @@ final class ConsumerSupport {
     }
 
     /** Logs which topic the consumer reads and as which group. */
-    static void logStart(String topic, String groupId, String bootstrapServers) {
-        log.info("Reading '{}' as group '{}' (bootstrap: {})", topic, groupId, bootstrapServers);
+    static void logStart(String topic, String groupId) {
+        log.info("Reading '{}' as group '{}'", topic, groupId);
     }
 
     /** Logs a hint when TODO 4 never called poll(), so the run does not look like a success. */

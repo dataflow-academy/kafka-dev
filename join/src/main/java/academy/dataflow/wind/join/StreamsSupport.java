@@ -41,10 +41,12 @@ final class StreamsSupport {
 
     private static final Logger log = LoggerFactory.getLogger(StreamsSupport.class);
 
+    /** Only for the admin client behind the topic check. */
+    private static final String BOOTSTRAP_SERVERS = "localhost:9092,localhost:9093,localhost:9094";
+
     /** The settings every lab app shares. */
-    static Properties baseConfig(String bootstrapServers, String applicationId, String stateDir) {
+    static Properties baseConfig(String applicationId, String stateDir) {
         Properties props = new Properties();
-        props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(StreamsConfig.APPLICATION_ID_CONFIG, applicationId);
         props.put(StreamsConfig.CLIENT_ID_CONFIG, hostname());
         props.put(StreamsConfig.REPLICATION_FACTOR_CONFIG, 3);
@@ -91,9 +93,9 @@ final class StreamsSupport {
      *
      * @return the partition count per topic
      */
-    static Map<String, Integer> requireTopics(String bootstrapServers, String... topics) {
+    static Map<String, Integer> requireTopics(String... topics) {
         Properties props = new Properties();
-        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, BOOTSTRAP_SERVERS);
         try (Admin admin = Admin.create(props)) {
             Set<String> existing = admin.listTopics().names().get();
             List<String> missing = List.of(topics).stream().filter(t -> !existing.contains(t)).toList();
@@ -108,7 +110,7 @@ final class StreamsSupport {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
         } catch (ExecutionException e) {
-            log.error("Cannot reach Kafka at {}: {}", bootstrapServers, e.getCause().toString());
+            log.error("Cannot reach Kafka at {}: {}", BOOTSTRAP_SERVERS, e.getCause().toString());
             System.exit(1);
             return Map.of();
         }

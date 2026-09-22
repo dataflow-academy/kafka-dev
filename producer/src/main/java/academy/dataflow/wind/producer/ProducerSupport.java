@@ -66,8 +66,8 @@ final class ProducerSupport {
     }
 
     /** Logs where the producer writes to and how often. */
-    static void logStart(String topic, long tickIntervalMs, String bootstrapServers) {
-        log.info("Producing to '{}' every {} ms (bootstrap: {})", topic, tickIntervalMs, bootstrapServers);
+    static void logStart(String topic, long tickIntervalMs) {
+        log.info("Producing to '{}' every {} ms", topic, tickIntervalMs);
     }
 
     /** Starts the clock for the reports and measures how large a record value is. */
@@ -131,7 +131,7 @@ final class ProducerSupport {
 
     /**
      * Installs a shutdown hook for Ctrl+C: it logs, runs {@code stop} and waits
-     * until {@link #closed()} says the producer has sent what was buffered.
+     * until {@link #exit(long)} says the producer is closed.
      */
     static void onShutdown(Runnable stop) {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -148,13 +148,12 @@ final class ProducerSupport {
         }, "shutdown-hook"));
     }
 
-    /** Tells the shutdown hook that the producer is closed. */
-    static void closed() {
-        stopped.countDown();
-    }
-
-    /** Ends the run: exit code 1 after giveUp(), a closing line otherwise. */
+    /**
+     * Ends the run after the producer is closed: releases a waiting shutdown
+     * hook, then exit code 1 after giveUp(), a closing line otherwise.
+     */
     static void exit(long produced) {
+        stopped.countDown();
         if (fatalError.get()) {
             log.error("Exiting due to a fatal delivery error (see log above)");
             System.exit(1);
